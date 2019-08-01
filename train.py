@@ -12,39 +12,37 @@ from data_reader import load_data, DataReader
 
 
 flags = tf.flags
-
-#config
-
-# data
-flags.DEFINE_string('data_dir',    'data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-flags.DEFINE_string('train_dir',   'cv',     'training directory (models and summaries are saved there periodically)')
-flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
-# model params
-flags.DEFINE_integer('rnn_size',        650,                            'size of LSTM internal state')
-flags.DEFINE_integer('highway_layers',  2,                              'number of highway layers')
-flags.DEFINE_integer('char_embed_size', 15,                             'dimensionality of character embeddings')
-flags.DEFINE_string ('kernels',         '[1,2,3,4,5,6,7]',              'CNN kernel widths')
-flags.DEFINE_string ('kernel_features', '[50,100,150,200,200,200,200]', 'number of features in the CNN kernel')
-flags.DEFINE_integer('rnn_layers',      2,                              'number of layers in the LSTM')
-flags.DEFINE_float  ('dropout',         0.5,                            'dropout. 0 = no dropout')
-
-# optimization
-flags.DEFINE_float  ('learning_rate_decay', 0.5,  'learning rate decay')
-flags.DEFINE_float  ('learning_rate',       1.0,  'starting learning rate')
-flags.DEFINE_float  ('decay_when',          1.0,  'decay if validation perplexity does not improve by more than this much')
-flags.DEFINE_float  ('param_init',          0.05, 'initialize parameters at')
-flags.DEFINE_integer('num_unroll_steps',    35,   'number of timesteps to unroll for')
-flags.DEFINE_integer('batch_size',          20,   'number of sequences to train on in parallel')
-flags.DEFINE_integer('max_epochs',          25,   'number of full passes through the training data')
-flags.DEFINE_float  ('max_grad_norm',       5.0,  'normalize gradients at')
-flags.DEFINE_integer('max_word_length',     65,   'maximum word length')
-
-# bookkeeping
-flags.DEFINE_integer('seed',           3435, 'random number generator seed')
-flags.DEFINE_integer('print_every',    5,    'how often to print current loss')
-flags.DEFINE_string ('EOS',            '+',  '<EOS> symbol. should be a single unused character (like +) for PTB and blank for others')
-
 FLAGS = flags.FLAGS
+
+def define_flasgs():
+    # data
+    flags.DEFINE_string('load_model_for_training',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+    # model params
+    flags.DEFINE_integer('rnn_size',        650,                            'size of LSTM internal state')
+    flags.DEFINE_integer('highway_layers',  2,                              'number of highway layers')
+    flags.DEFINE_integer('char_embed_size', 15,                             'dimensionality of character embeddings')
+    flags.DEFINE_string ('kernels',         '[1,2,3,4,5,6,7]',              'CNN kernel widths')
+    flags.DEFINE_string ('kernel_features', '[50,100,150,200,200,200,200]', 'number of features in the CNN kernel')
+    flags.DEFINE_integer('rnn_layers',      2,                              'number of layers in the LSTM')
+    flags.DEFINE_float  ('dropout',         0.5,                            'dropout. 0 = no dropout')
+
+    # optimization
+    flags.DEFINE_float  ('learning_rate_decay', 0.5,  'learning rate decay')
+    flags.DEFINE_float  ('learning_rate',       1.0,  'starting learning rate')
+    flags.DEFINE_float  ('decay_when',          1.0,  'decay if validation perplexity does not improve by more than this much')
+    flags.DEFINE_float  ('param_init',          0.05, 'initialize parameters at')
+    flags.DEFINE_integer('num_unroll_steps',    35,   'number of timesteps to unroll for')
+    flags.DEFINE_integer('batch_size',          20,   'number of sequences to train on in parallel')
+    flags.DEFINE_integer('max_epochs',          25,   'number of full passes through the training data')
+    flags.DEFINE_float  ('max_grad_norm',       5.0,  'normalize gradients at')
+    flags.DEFINE_integer('max_word_length',     65,   'maximum word length')
+
+    # bookkeeping
+    flags.DEFINE_integer('seed',           3435, 'random number generator seed')
+    flags.DEFINE_integer('print_every',    5,    'how often to print current loss')
+    flags.DEFINE_string ('EOS',            '+',  '<EOS> symbol. should be a single unused character (like +) for PTB and blank for others')
+
+
 
 
 def run_test(session, m, data, batch_size, num_steps):
@@ -67,9 +65,9 @@ def run_test(session, m, data, batch_size, num_steps):
     return costs / iters
 
 
-def main(_):
+def main(print, embedding):
     ''' Trains model from data '''
-    print(os.path)
+    define_flasgs()
     if not os.path.exists(FLAGS.train_dir):
         os.mkdir(FLAGS.train_dir)
         print('Created training directory', FLAGS.train_dir)
@@ -139,14 +137,15 @@ def main(_):
                     dropout=0.0)
             valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
-        if FLAGS.load_model:
-            saver.restore(session, FLAGS.load_model)
-            print('Loaded model from', FLAGS.load_model, 'saved at global step', train_model.global_step.eval())
+        if FLAGS.load_model_for_training:
+            saver.restore(session, FLAGS.load_model_for_training)
+            string = str('Loaded model from'+ str(FLAGS.load_model_for_training)+ 'saved at global step'+str(train_model.global_step.eval()))
+            print(string)
         else:
             tf.global_variables_initializer().run()
             session.run(train_model.clear_char_embedding_padding)
-            print('Created and initialized fresh model. Size:', model.model_size())
-
+            string = str('Created and initialized fresh model. Size:'+str(model.model_size()))
+            print(string)
         summary_writer = tf.summary.FileWriter(FLAGS.train_dir, graph=session.graph)
 
         ''' take learning rate from CLI, not from saved graph '''
@@ -184,15 +183,15 @@ def main(_):
                 time_elapsed = time.time() - start_time
 
                 if count % FLAGS.print_every == 0:
-                    print('%6d: %d [%5d/%5d], train_loss/perplexity = %6.8f/%6.7f secs/batch = %.4fs, grad.norm=%6.8f' % (step,
+                    string = str('%6d: %d [%5d/%5d], train_loss/perplexity = %6.8f/%6.7f secs/batch = %.4fs, grad.norm=%6.8f' % (step,
                                                             epoch, count,
                                                             train_reader.length,
                                                             loss, np.exp(loss),
                                                             time_elapsed,
                                                             gradient_norm))
-
-            print('Epoch training time:', time.time()-epoch_start_time)
-
+                    print(string)
+            string = str('Epoch training time:' + str(time.time()-epoch_start_time))
+            print(string)
             # epoch done: time to evaluate
             avg_valid_loss = 0.0
             count = 0
@@ -211,16 +210,17 @@ def main(_):
                 })
 
                 if count % FLAGS.print_every == 0:
-                    print("\t> validation loss = %6.8f, perplexity = %6.8f" % (loss, np.exp(loss)))
+                    string = str("\t> validation loss = %6.8f, perplexity = %6.8f" % (loss, np.exp(loss)))
+                    print(string)
                 avg_valid_loss += loss / valid_reader.length
 
-            print("at the end of epoch:", epoch)
+            print("at the end of epoch:" + str(epoch))
             print("train loss = %6.8f, perplexity = %6.8f" % (avg_train_loss, np.exp(avg_train_loss)))
             print("validation loss = %6.8f, perplexity = %6.8f" % (avg_valid_loss, np.exp(avg_valid_loss)))
 
             save_as = '%s/epoch%03d_%.4f.model' % (FLAGS.train_dir, epoch, avg_valid_loss)
             saver.save(session, save_as)
-            print('Saved model', save_as)
+            print('Saved model' + str(save_as))
 
             ''' write out summary events '''
             summary = tf.Summary(value=[
@@ -233,14 +233,16 @@ def main(_):
             if best_valid_loss is not None and np.exp(avg_valid_loss) > np.exp(best_valid_loss) - FLAGS.decay_when:
                 print('validation perplexity did not improve enough, decay learning rate')
                 current_learning_rate = session.run(train_model.learning_rate)
-                print('learning rate was:', current_learning_rate)
+                string = str('learning rate was:' + str(current_learning_rate))
+                print(string)
                 current_learning_rate *= FLAGS.learning_rate_decay
                 if current_learning_rate < 1.e-5:
                     print('learning rate too small - stopping now')
                     break
 
                 session.run(train_model.learning_rate.assign(current_learning_rate))
-                print('new learning rate is:', current_learning_rate)
+                string = str('new learning rate is:' + str(current_learning_rate))
+                print(string)
             else:
                 best_valid_loss = avg_valid_loss
 

@@ -10,33 +10,7 @@ import tensorflow as tf
 import model
 from data_reader import load_data, DataReader
 
-
-flags = tf.flags
-
-# data
-flags.DEFINE_string('data_dir',    'data',   'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-flags.DEFINE_string('train_dir',   'cv',     'training directory (models and summaries are saved there periodically)')
-flags.DEFINE_string('load_model',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
-
-# model params
-flags.DEFINE_integer('rnn_size',        650,                            'size of LSTM internal state')
-flags.DEFINE_integer('highway_layers',  2,                              'number of highway layers')
-flags.DEFINE_integer('char_embed_size', 15,                             'dimensionality of character embeddings')
-flags.DEFINE_string ('kernels',         '[1,2,3,4,5,6,7]',              'CNN kernel widths')
-flags.DEFINE_string ('kernel_features', '[50,100,150,200,200,200,200]', 'number of features in the CNN kernel')
-flags.DEFINE_integer('rnn_layers',      2,                              'number of layers in the LSTM')
-flags.DEFINE_float  ('dropout',         0.5,                            'dropout. 0 = no dropout')
-
-# optimization
-flags.DEFINE_integer('num_unroll_steps',    35,   'number of timesteps to unroll for')
-flags.DEFINE_integer('batch_size',          20,   'number of sequences to train on in parallel')
-flags.DEFINE_integer('max_word_length',     65,   'maximum word length')
-
-# bookkeeping
-flags.DEFINE_integer('seed',           3435, 'random number generator seed')
-flags.DEFINE_string ('EOS',            '+',  '<EOS> symbol. should be a single unused character (like +) for PTB and blank for others')
-
-FLAGS = flags.FLAGS
+FLAGS = tf.flags.FLAGS
 
 
 def run_test(session, m, data, batch_size, num_steps):
@@ -58,16 +32,15 @@ def run_test(session, m, data, batch_size, num_steps):
 
     return costs / iters
 
-
-def main(_):
+def main(print, embedding,epoch_test = None):
     ''' Loads trained model and evaluates it on test split '''
-
-    if FLAGS.load_model is None:
+    tf.flags.DEFINE_string('load_model_for_training',   epoch_test,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+    if FLAGS.load_model_for_test is None:
         print('Please specify checkpoint file to load model from')
         return -1
 
-    if not os.path.exists(FLAGS.load_model + ".index"):
-        print('Checkpoint file not found', FLAGS.load_model)
+    if not os.path.exists(FLAGS.load_model_for_test + ".index"):
+        print('Checkpoint file not found', FLAGS.load_model_for_test)
         return -1
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
@@ -104,8 +77,8 @@ def main(_):
             global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
 
         saver = tf.train.Saver()
-        saver.restore(session, FLAGS.load_model)
-        print('Loaded model from', FLAGS.load_model, 'saved at global step', global_step.eval())
+        saver.restore(session, FLAGS.load_model_for_test)
+        print('Loaded model from', FLAGS.load_model_for_test, 'saved at global step', global_step.eval())
 
         ''' training starts here '''
         rnn_state = session.run(m.initial_rnn_state)
