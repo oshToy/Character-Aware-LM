@@ -1,9 +1,0 @@
-{
-"logs_folder":"./logs/",
-"data_sets_folder":"./data_sets",
-"trained_models_folder":"./trained_models",
-"models":[{"data_set":"PeenTreeBank","training":"True","epoch_test":"25","testing":"False","embedding":"['kim']"}
-
-
-]
-}

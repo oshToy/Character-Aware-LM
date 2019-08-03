@@ -6,7 +6,7 @@ import os
 import time
 import numpy as np
 import tensorflow as tf
-
+import pandas as pd
 import model
 from data_reader import load_data, DataReader
 
@@ -32,9 +32,29 @@ def run_test(session, m, data, batch_size, num_steps):
 
     return costs / iters
 
-def main(print, embedding,epoch_test = None):
+
+def initialize_epoch_data_dict():
+    return {
+        'test_loss': list(),
+        'test_perplexity': list(),
+        'test_samples': list(),
+        'time_elapsed': list(),
+        'time_per_batch': list(),
+    }
+
+def save_data_to_csv(avg_loss,count,time_elapsed):
+    pd.DataFrame(FLAGS.flag_values_dict(), index=range(1)).to_csv(FLAGS.train_dir + '/test_parameters.csv')
+    test_results = initialize_epoch_data_dict()
+
+    test_results['test_loss'].append(avg_loss)
+    test_results['test_perplexity'].append(np.exp(avg_loss))
+    test_results["test_samples"].append(count * FLAGS.batch_size)
+    test_results["time_elapsed"].append(time_elapsed)
+    test_results["time_per_batch"].append(time_elapsed / count)
+
+    pd.DataFrame(test_results, index=range(1)).to_csv(FLAGS.train_dir + '/test_results.csv')
+def main(print, embedding):
     ''' Loads trained model and evaluates it on test split '''
-    tf.flags.DEFINE_string('load_model_for_training',   epoch_test,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
     if FLAGS.load_model_for_test is None:
         print('Please specify checkpoint file to load model from')
         return -1
@@ -78,7 +98,7 @@ def main(print, embedding,epoch_test = None):
 
         saver = tf.train.Saver()
         saver.restore(session, FLAGS.load_model_for_test)
-        print('Loaded model from', FLAGS.load_model_for_test, 'saved at global step', global_step.eval())
+        print('Loaded model from' + str(FLAGS.load_model_for_test) + 'saved at global step' +str(global_step.eval()))
 
         ''' training starts here '''
         rnn_state = session.run(m.initial_rnn_state)
@@ -102,7 +122,10 @@ def main(print, embedding,epoch_test = None):
         time_elapsed = time.time() - start_time
 
         print("test loss = %6.8f, perplexity = %6.8f" % (avg_loss, np.exp(avg_loss)))
-        print("test samples:", count*FLAGS.batch_size, "time elapsed:", time_elapsed, "time per one batch:", time_elapsed/count)
+        print("test samples:" + str( count*FLAGS.batch_size) + "time elapsed:" + str( time_elapsed) + "time per one batch:" +str(time_elapsed/count))
+
+        save_data_to_csv(avg_loss, count, time_elapsed)
+
 
 
 if __name__ == "__main__":

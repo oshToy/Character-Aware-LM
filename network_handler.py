@@ -5,8 +5,7 @@ from evaluate import main as test
 import datetime
 import json
 import tensorflow as tf
-
-CONFIG_FILE = 'config.txt'
+CONFIG_FILE = 'config.json'
 flags = tf.flags
 
 
@@ -18,21 +17,57 @@ def main():
 
     for model in config_dict['models']:
         logger = logger_for_print(folder=logs_folder, file_name=config_dict['data_sets_folder'])
+
         #copy_data_files(data_folder=data_sets_folder + model['data_set'])
         data_set = model['data_set']
         del_all_flags(tf.flags.FLAGS)
+
         flags.DEFINE_string('data_dir', data_sets_folder + '/' + data_set,
                             'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-        flags.DEFINE_string('train_dir', trained_models_folder + '/' + data_set,
-                            'training directory (models and summaries are saved there periodically)')
-        if 'training' in model and model['training'] == 'True':
+        trained_model_folder = trained_models_folder + '/' + data_set + '_' + str(datetime.datetime.now().strftime('%Y-%m-%d--%H-%M-%S'))
+        flags.DEFINE_string('train_dir', trained_model_folder , 'training directory (models and summaries are saved there periodically)')
+
+        if model['training']:
             embedding = list(model['embedding'])
             train(logger, embedding)
-        if 'testing' in model and model['testing'] == 'True':
-            if 'epoch_test' in model:
-                test(logger, embedding , model['epoch_test'])
-            else:
-                test(logger, embedding)
+        if model['testing']:
+            checkpoint_file = checkpoint_file_from_number(model,trained_model_folder, logger)
+            logger("test on model file : " + str(checkpoint_file))
+            if not checkpoint_file:
+                break
+            checkpoint_file = checkpoint_file.replace(".index", "")
+            tf.flags.DEFINE_string('load_model_for_test', trained_model_folder + '/' + checkpoint_file,
+                                   '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+            test(logger, embedding)
+
+
+def checkpoint_file_from_number(model,trained_model_folder,print):
+    #epoch011_4.4827.model.index
+    if model["checkpoint_file_for_test"]:
+        return model["checkpoint_file_for_test"]
+
+    files_list = os.listdir(trained_model_folder)
+    if not model['checkpoint_number_for_test_or_null_for_last_checkpoint'] and model['training']:
+        print("testing last checkpoint from training folder : " + str(trained_model_folder))
+        index_numbers_list = list()
+        for file in files_list:
+            if ".index" in file:
+                index_numbers_list.append(int(file.split('_')[0].split('h')[1]))
+        last_checkpoint_number = max(index_numbers_list)
+        for file in files_list:
+            if ".index" in file and str(last_checkpoint_number) in  file.split('_')[0]:
+                return file
+
+    elif model['checkpoint_number_for_test_or_null_for_last_checkpoint']:
+        for file in files_list:
+            if ".index" in file and str(model['checkpoint_number_for_test_or_null_for_last_checkpoint']) in file.split('_')[0]:
+                return file
+        print("checkpoint_number_for_test: " + str(model['checkpoint_number_for_test_or_null_for_last_checkpoint']) + "Not Found")
+        return None
+    else:
+        print("checkpoint_number_for_test is missing")
+
+        return None
 
 
 def import_config_settings():
@@ -48,12 +83,11 @@ def del_all_flags(FLAGS):
 
 
 def logger_for_print(folder='', file_name='logger'):
-    logging.basicConfig(level=logging.CRITICAL, format='%(message)s')
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
     logger = logging.getLogger()
     date = str(datetime.datetime.now()).replace(':', '_').replace('.', '_')
     logger.addHandler(logging.FileHandler(folder + '\\' + file_name + date+'.log', 'a'))
-    print = logger.critical
-    return print
+    return logger.info
 
 
 def copy_data_files(data_folder):

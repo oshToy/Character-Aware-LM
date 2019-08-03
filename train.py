@@ -9,12 +9,12 @@ import tensorflow as tf
 
 import model
 from data_reader import load_data, DataReader
-
+import pandas as pd
 
 flags = tf.flags
 FLAGS = flags.FLAGS
 
-def define_flasgs():
+def define_flags():
     # data
     flags.DEFINE_string('load_model_for_training',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
     # model params
@@ -33,7 +33,7 @@ def define_flasgs():
     flags.DEFINE_float  ('param_init',          0.05, 'initialize parameters at')
     flags.DEFINE_integer('num_unroll_steps',    35,   'number of timesteps to unroll for')
     flags.DEFINE_integer('batch_size',          20,   'number of sequences to train on in parallel')
-    flags.DEFINE_integer('max_epochs',          25,   'number of full passes through the training data')
+    flags.DEFINE_integer('max_epochs',          30,   'number of full passes through the training data')
     flags.DEFINE_float  ('max_grad_norm',       5.0,  'normalize gradients at')
     flags.DEFINE_integer('max_word_length',     65,   'maximum word length')
 
@@ -65,12 +65,29 @@ def run_test(session, m, data, batch_size, num_steps):
     return costs / iters
 
 
+def initialize_epoch_data_dict():
+            return {
+                'epoch_number': list(),
+                'train_loss': list(),
+                'train_perplexity': list(),
+                'validation_loss': list(),
+                'valid_perplexity': list(),
+                "epoch_training_time": list(),
+                "model_name": list(),
+                "learning_rate": list()
+            }
+
+
 def main(print, embedding):
     ''' Trains model from data '''
-    define_flasgs()
+    define_flags()
     if not os.path.exists(FLAGS.train_dir):
         os.mkdir(FLAGS.train_dir)
-        print('Created training directory', FLAGS.train_dir)
+        print('Created training directory' + FLAGS.train_dir)
+
+    # CSV initialize
+    pd.DataFrame(FLAGS.flag_values_dict(), index=range(1)).to_csv(FLAGS.train_dir + '/train_parameters.csv')
+    epochs_results = initialize_epoch_data_dict()
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
         load_data(FLAGS.data_dir, FLAGS.max_word_length, eos=FLAGS.EOS)
@@ -192,6 +209,8 @@ def main(print, embedding):
                     print(string)
             string = str('Epoch training time:' + str(time.time()-epoch_start_time))
             print(string)
+            epochs_results['epoch_training_time'].append(str(time.time()-epoch_start_time))
+
             # epoch done: time to evaluate
             avg_valid_loss = 0.0
             count = 0
@@ -214,13 +233,21 @@ def main(print, embedding):
                     print(string)
                 avg_valid_loss += loss / valid_reader.length
 
+
             print("at the end of epoch:" + str(epoch))
+            epochs_results['epoch_number'].append(str(epoch))
             print("train loss = %6.8f, perplexity = %6.8f" % (avg_train_loss, np.exp(avg_train_loss)))
+            epochs_results['train_loss'].append(avg_train_loss)
+            epochs_results['train_perplexity'].append(np.exp(avg_train_loss))
             print("validation loss = %6.8f, perplexity = %6.8f" % (avg_valid_loss, np.exp(avg_valid_loss)))
+            epochs_results['validation_loss'].append(avg_valid_loss)
+            epochs_results['valid_perplexity'].append(np.exp(avg_valid_loss))
 
             save_as = '%s/epoch%03d_%.4f.model' % (FLAGS.train_dir, epoch, avg_valid_loss)
             saver.save(session, save_as)
             print('Saved model' + str(save_as))
+            epochs_results['model_name'].append(str(save_as))
+            epochs_results['learning_rate'].append(str(session.run(train_model.learning_rate)))
 
             ''' write out summary events '''
             summary = tf.Summary(value=[
@@ -245,6 +272,10 @@ def main(print, embedding):
                 print(string)
             else:
                 best_valid_loss = avg_valid_loss
+
+
+    # Save model performance data
+    pd.DataFrame(epochs_results).to_csv(FLAGS.train_dir + '/train_results.csv')
 
 
 if __name__ == "__main__":
