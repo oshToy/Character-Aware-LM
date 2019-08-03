@@ -1,9 +1,19 @@
 
+*.pyc
 *.log
-*.data-00000-of-00001
 *.meta
 *.index
-*.GPU-STUD-OHAD
-*.GPU-STUD-OHAD
-*.GPU-STUD-OHAD
+*.data-00000-of-00001
 trained_models/PeenTreeBank/checkpoint
+*.GPU-STUD-OHAD
+trained_models/AMI_2019-08-02--14-24-14/checkpoint
+*.pyc
+*.pyc
+*.log
+*.log
+*.log
+logs/data_sets2019-08-02 14_18_23_754464.log
+*.log
+*.meta
+*.data-00000-of-00001
+*.log
