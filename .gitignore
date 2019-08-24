@@ -17,3 +17,4 @@ logs/data_sets2019-08-02 14_18_23_754464.log
 *.meta
 *.data-00000-of-00001
 *.log
+*.csv
