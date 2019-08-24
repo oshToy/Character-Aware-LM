@@ -124,7 +124,8 @@ def main(print, embedding):
                     kernels=eval(FLAGS.kernels),
                     kernel_features=eval(FLAGS.kernel_features),
                     num_unroll_steps=FLAGS.num_unroll_steps,
-                    dropout=FLAGS.dropout)
+                    dropout=FLAGS.dropout,
+                    embedding=embedding)
             train_model.update(model.loss_graph(train_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
             # scaling loss by FLAGS.num_unroll_steps effectively scales gradients by the same factor.
@@ -232,7 +233,6 @@ def main(print, embedding):
                     string = str("\t> validation loss = %6.8f, perplexity = %6.8f" % (loss, np.exp(loss)))
                     print(string)
                 avg_valid_loss += loss / valid_reader.length
-
 
             print("at the end of epoch:" + str(epoch))
             epochs_results['epoch_number'].append(str(epoch))

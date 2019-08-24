@@ -1,7 +1,6 @@
 from __future__ import print_function
 from __future__ import division
 
-
 import tensorflow as tf
 
 
@@ -9,6 +8,7 @@ class adict(dict):
     ''' Attribute dictionary - a convenience data structure, similar to SimpleNamespace in python 3.3
         One can use attributes to read/write dictionary content.
     '''
+
     def __init__(self, *av, **kav):
         dict.__init__(self, *av, **kav)
         self.__dict__ = self
@@ -51,7 +51,12 @@ def linear(input_, output_size, scope=None):
 
     return tf.matmul(input_, tf.transpose(matrix)) + bias_term
 
-
+def connection(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Embedding Connection'):
+    '''
+    connection between 2 types of embedding
+    '''
+    with tf.variable_scope(scope):
+     return
 def highway(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Highway'):
     """Highway Network (cf. http://arxiv.org/abs/1505.00387).
 
@@ -115,11 +120,11 @@ def inference_graph(char_vocab_size, word_vocab_size,
                     num_rnn_layers=2,
                     rnn_size=650,
                     max_word_length=65,
-                    kernels         = [ 1,   2,   3,   4,   5,   6,   7],
-                    kernel_features = [50, 100, 150, 200, 200, 200, 200],
+                    kernels=[1, 2, 3, 4, 5, 6, 7],
+                    kernel_features=[50, 100, 150, 200, 200, 200, 200],
                     num_unroll_steps=35,
-                    dropout=0.0):
-
+                    dropout=0.0,
+                    embedding=['kim']):
     assert len(kernels) == len(kernel_features), 'Kernel and Features must have the same size'
 
     input_ = tf.placeholder(tf.int32, shape=[batch_size, num_unroll_steps, max_word_length], name="input")
@@ -133,7 +138,8 @@ def inference_graph(char_vocab_size, word_vocab_size,
         zero embedding vector and ignores gradient updates. For that do the following in TF:
         1. after parameter initialization, apply this op to zero out padding embedding vector
         2. after each gradient update, apply this op to keep padding at zero'''
-        clear_char_embedding_padding = tf.scatter_update(char_embedding, [0], tf.constant(0.0, shape=[1, char_embed_size]))
+        clear_char_embedding_padding = tf.scatter_update(char_embedding, [0],
+                                                         tf.constant(0.0, shape=[1, char_embed_size]))
 
         # [batch_size x max_word_length, num_unroll_steps, char_embed_size]
         input_embedded = tf.nn.embedding_lookup(char_embedding, input_)
@@ -144,6 +150,9 @@ def inference_graph(char_vocab_size, word_vocab_size,
     # [batch_size x num_unroll_steps, cnn_size]  # where cnn_size=sum(kernel_features)
     input_cnn = tdnn(input_embedded, kernels, kernel_features)
 
+    if 'fastTexxt' in embedding:
+        input_cnn = connection(input_cnn, input_cnn.get_shape()[-1])
+
     ''' Maybe apply Highway '''
     if num_highway_layers > 0:
         input_cnn = highway(input_cnn, input_cnn.get_shape()[-1], num_layers=num_highway_layers)
@@ -153,9 +162,9 @@ def inference_graph(char_vocab_size, word_vocab_size,
         def create_rnn_cell():
             cell = tf.contrib.rnn.BasicLSTMCell(rnn_size, state_is_tuple=True, forget_bias=0.0, reuse=False)
             if dropout > 0.0:
-                cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=1.-dropout)
+                cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=1. - dropout)
             return cell
-        
+
         if num_rnn_layers > 1:
             cell = tf.contrib.rnn.MultiRNNCell([create_rnn_cell() for _ in range(num_rnn_layers)], state_is_tuple=True)
         else:
@@ -167,7 +176,7 @@ def inference_graph(char_vocab_size, word_vocab_size,
         input_cnn2 = [tf.squeeze(x, [1]) for x in tf.split(input_cnn, num_unroll_steps, 1)]
 
         outputs, final_rnn_state = tf.contrib.rnn.static_rnn(cell, input_cnn2,
-                                         initial_state=initial_rnn_state, dtype=tf.float32)
+                                                             initial_state=initial_rnn_state, dtype=tf.float32)
 
         # linear projection onto output (word) vocab
         logits = []
@@ -178,24 +187,24 @@ def inference_graph(char_vocab_size, word_vocab_size,
                 logits.append(linear(output, word_vocab_size))
 
     return adict(
-        input = input_,
+        input=input_,
         clear_char_embedding_padding=clear_char_embedding_padding,
         input_embedded=input_embedded,
         input_cnn=input_cnn,
         initial_rnn_state=initial_rnn_state,
         final_rnn_state=final_rnn_state,
         rnn_outputs=outputs,
-        logits = logits
+        logits=logits
     )
 
 
 def loss_graph(logits, batch_size, num_unroll_steps):
-
     with tf.variable_scope('Loss'):
         targets = tf.placeholder(tf.int64, [batch_size, num_unroll_steps], name='targets')
         target_list = [tf.squeeze(x, [1]) for x in tf.split(targets, num_unroll_steps, 1)]
 
-        loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits, labels = target_list), name='loss')
+        loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=target_list),
+                              name='loss')
 
     return adict(
         targets=targets,
@@ -226,7 +235,6 @@ def training_graph(loss, learning_rate=1.0, max_grad_norm=5.0):
 
 
 def model_size():
-
     params = tf.trainable_variables()
     size = 0
     for x in params:
@@ -238,9 +246,7 @@ def model_size():
 
 
 if __name__ == '__main__':
-
     with tf.Session() as sess:
-
         with tf.variable_scope('Model'):
             graph = inference_graph(char_vocab_size=51, word_vocab_size=10000, dropout=0.5)
             graph.update(loss_graph(graph.logits, batch_size=20, num_unroll_steps=35))
