@@ -11,6 +11,9 @@
     "trained_models_folder": {
       "type": "string"
     },
+    "fasttext_model_path": {
+      "type": "string"
+    },
     "models": {
       "type": "array",
       "items": [

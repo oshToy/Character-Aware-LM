@@ -2,6 +2,7 @@
 "logs_folder":"./logs/",
 "data_sets_folder":"./data_sets",
 "trained_models_folder":"./trained_models",
+"fasttext_model_path": "r\"C:\\RNNLM Project\\Models\\Wikipedia\\Lower Case\\15 Epoch\\Wikipedia_epoch15.model\"",
 "models":[{
  "data_set": "AMI",
  "training": true,

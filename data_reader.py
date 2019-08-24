@@ -64,8 +64,9 @@ def load_data(data_dir, max_word_length, eos='+'):
 
     word_tokens = collections.defaultdict(list)
     char_tokens = collections.defaultdict(list)
-
+    words = {}
     for fname in ('train', 'valid', 'test'):
+        words[fname] = list()
         print('reading', fname)
         with codecs.open(os.path.join(data_dir, fname + '.txt'), 'r', 'utf-8') as f:
             for line in f:
@@ -76,6 +77,7 @@ def load_data(data_dir, max_word_length, eos='+'):
                     line = line.replace(eos, '')
 
                 for word in line.split():
+                    words[fname].append(word)
                     if len(word) > max_word_length - 2:  # space for 'start' and 'end' chars
                         word = word[:max_word_length-2]
 
@@ -114,7 +116,7 @@ def load_data(data_dir, max_word_length, eos='+'):
         for i, char_array in enumerate(char_tokens[fname]):
             char_tensors[fname] [i,:len(char_array)] = char_array
 
-    return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length
+    return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length, words
 
 
 class DataReader:

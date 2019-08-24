@@ -2,7 +2,7 @@ from __future__ import print_function
 from __future__ import division
 
 import tensorflow as tf
-
+import numpy as np
 
 class adict(dict):
     ''' Attribute dictionary - a convenience data structure, similar to SimpleNamespace in python 3.3
@@ -22,6 +22,35 @@ def conv2d(input_, output_dim, k_h, k_w, name="conv2d"):
     return tf.nn.conv2d(input_, w, strides=[1, 1, 1, 1], padding='VALID') + b
 
 
+def linearFT(output_size, scope=None):
+
+    shape = tf.shape([300, 1])
+    if len(shape) != 2:
+        raise ValueError("Linear is expecting 2D arguments: %s" % str(shape))
+    if not shape[1]:
+        raise ValueError("Linear expects shape[1] of arguments: %s" % str(shape))
+    input_size = shape[1]
+
+    # Now the computation.
+    with tf.variable_scope(scope or "SimpleLinear"):
+        matrix = tf.get_variable("Matrix", [output_size, input_size], dtype='f')
+        bias_term = tf.get_variable("Bias", [output_size], dtype='f')
+
+    return tf.matmul(tf.transpose(matrix)) + bias_term
+
+def linearFT(_input,output_size, scope=None):
+    shape = _input.get_shape().as_list()
+    if len(shape) != 2:
+        raise ValueError("Linear is expecting 2D arguments: %s" % str(shape))
+    if not shape[1]:
+        raise ValueError("Linear expects shape[1] of arguments: %s" % str(shape))
+    input_size = shape[1]
+    # Now the computation.
+    with tf.variable_scope(scope or "SimpleLinear"):
+        matrix = tf.get_variable("Matrix", [output_size, input_size], dtype=tf.float32)
+        bias_term = tf.get_variable("Bias", [output_size], dtype=tf.float32)
+    return tf.matmul(_input, tf.transpose(matrix)) + bias_term
+
 def linear(input_, output_size, scope=None):
     '''
     Linear map: output[k] = sum_i(Matrix[k, i] * args[i] ) + Bias[k]
@@ -36,7 +65,6 @@ def linear(input_, output_size, scope=None):
   Raises:
     ValueError: if some of the arguments has unspecified or wrong shape.
   '''
-
     shape = input_.get_shape().as_list()
     if len(shape) != 2:
         raise ValueError("Linear is expecting 2D arguments: %s" % str(shape))
@@ -150,8 +178,8 @@ def inference_graph(char_vocab_size, word_vocab_size,
     # [batch_size x num_unroll_steps, cnn_size]  # where cnn_size=sum(kernel_features)
     input_cnn = tdnn(input_embedded, kernels, kernel_features)
 
-    if 'fastTexxt' in embedding:
-        input_cnn = connection(input_cnn, input_cnn.get_shape()[-1])
+    if 'fastText' in embedding:
+        linearFT(tf.Dimension(1100), scope='fastTextFC')
 
     ''' Maybe apply Highway '''
     if num_highway_layers > 0:

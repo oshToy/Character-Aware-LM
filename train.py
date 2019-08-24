@@ -31,8 +31,8 @@ def define_flags():
     flags.DEFINE_float  ('learning_rate',       1.0,  'starting learning rate')
     flags.DEFINE_float  ('decay_when',          1.0,  'decay if validation perplexity does not improve by more than this much')
     flags.DEFINE_float  ('param_init',          0.05, 'initialize parameters at')
-    flags.DEFINE_integer('num_unroll_steps',    35,   'number of timesteps to unroll for')
-    flags.DEFINE_integer('batch_size',          20,   'number of sequences to train on in parallel')
+    flags.DEFINE_integer('num_unroll_steps',    1,   'number of timesteps to unroll for')
+    flags.DEFINE_integer('batch_size',          1,   'number of sequences to train on in parallel')
     flags.DEFINE_integer('max_epochs',          30,   'number of full passes through the training data')
     flags.DEFINE_float  ('max_grad_norm',       5.0,  'normalize gradients at')
     flags.DEFINE_integer('max_word_length',     65,   'maximum word length')
@@ -89,7 +89,7 @@ def main(print, embedding):
     pd.DataFrame(FLAGS.flag_values_dict(), index=range(1)).to_csv(FLAGS.train_dir + '/train_parameters.csv')
     epochs_results = initialize_epoch_data_dict()
 
-    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
+    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words = \
         load_data(FLAGS.data_dir, FLAGS.max_word_length, eos=FLAGS.EOS)
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
