@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="JsonSchemaMappingsProjectConfiguration">
+    <state>
+      <map>
+        <entry key="models_training">
+          <value>
+            <SchemaInfo>
+              <option name="name" value="models_training" />
+              <option name="relativePathToSchema" value="json_schema.json" />
+              <option name="schemaVersion" value="JSON schema version 7" />
+              <option name="patterns">
+                <list>
+                  <Item>
+                    <option name="path" value="config.json" />
+                  </Item>
+                </list>
+              </option>
+            </SchemaInfo>
+          </value>
+        </entry>
+      </map>
+    </state>
+  </component>
+</project>
