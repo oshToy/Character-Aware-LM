@@ -5,6 +5,8 @@ import os
 import codecs
 import collections
 import numpy as np
+from gensim.models import FastText
+
 
 
 class Vocab:
@@ -51,7 +53,6 @@ class Vocab:
 
 
 def load_data(data_dir, max_word_length, eos='+'):
-
     char_vocab = Vocab()
     char_vocab.feed(' ')  # blank is at index 0 in char vocab
     char_vocab.feed('{')  # start is at index 1 in char vocab
@@ -79,7 +80,7 @@ def load_data(data_dir, max_word_length, eos='+'):
                 for word in line.split():
                     words[fname].append(word)
                     if len(word) > max_word_length - 2:  # space for 'start' and 'end' chars
-                        word = word[:max_word_length-2]
+                        word = word[:max_word_length - 2]
 
                     word_tokens[fname].append(word_vocab.feed(word))
 
@@ -114,10 +115,17 @@ def load_data(data_dir, max_word_length, eos='+'):
         char_tensors[fname] = np.zeros([len(char_tokens[fname]), actual_max_word_length], dtype=np.int32)
 
         for i, char_array in enumerate(char_tokens[fname]):
-            char_tensors[fname] [i,:len(char_array)] = char_array
+            char_tensors[fname][i, :len(char_array)] = char_array
 
     return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length, words
 
+
+class FasttextModel:
+    def __init__(self,fasttext_path=None):
+        self.fasttext_model = FastText.load(fasttext_path)
+
+    def get_fasttext_model(self):
+        return self.fasttext_model
 
 class DataReader:
 
@@ -151,7 +159,6 @@ class DataReader:
         self.num_unroll_steps = num_unroll_steps
 
     def iter(self):
-
         for x, y in zip(self._x_batches, self._y_batches):
             yield x, y
 

@@ -91,7 +91,9 @@ def main(print, embedding):
                     kernels=eval(FLAGS.kernels),
                     kernel_features=eval(FLAGS.kernel_features),
                     num_unroll_steps=FLAGS.num_unroll_steps,
-                    dropout=0)
+                    dropout=0,
+                    embedding=embedding,
+                    fasttext_word_dim=300)
             m.update(model.loss_graph(m.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
             global_step = tf.Variable(0, dtype=tf.int32, name='global_step')

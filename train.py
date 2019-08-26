@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 
 import model
-from data_reader import load_data, DataReader
+from data_reader import load_data, DataReader, FasttextModel
 import pandas as pd
 
 flags = tf.flags
@@ -89,8 +89,16 @@ def main(print, embedding):
     pd.DataFrame(FLAGS.flag_values_dict(), index=range(1)).to_csv(FLAGS.train_dir + '/train_parameters.csv')
     epochs_results = initialize_epoch_data_dict()
 
+    fasttext_model_path = None
+    if FLAGS.fasttext_model_path:
+        fasttext_model_path = FLAGS.fasttext_model_path
+
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words = \
         load_data(FLAGS.data_dir, FLAGS.max_word_length, eos=FLAGS.EOS)
+
+    fasttext_model = None
+    if 'fasttext' in embedding:
+        fasttext_model = FasttextModel(fasttext_path=fasttext_model_path).get_fasttext_model()
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
@@ -125,7 +133,8 @@ def main(print, embedding):
                     kernel_features=eval(FLAGS.kernel_features),
                     num_unroll_steps=FLAGS.num_unroll_steps,
                     dropout=FLAGS.dropout,
-                    embedding=embedding)
+                    embedding=embedding,
+                    fasttext_word_dim=300)
             train_model.update(model.loss_graph(train_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
             # scaling loss by FLAGS.num_unroll_steps effectively scales gradients by the same factor.
@@ -152,7 +161,9 @@ def main(print, embedding):
                     kernels=eval(FLAGS.kernels),
                     kernel_features=eval(FLAGS.kernel_features),
                     num_unroll_steps=FLAGS.num_unroll_steps,
-                    dropout=0.0)
+                    dropout=0.0,
+                    embedding=embedding,
+                    fasttext_word_dim=300)
             valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
         if FLAGS.load_model_for_training:
@@ -182,19 +193,34 @@ def main(print, embedding):
             for x, y in train_reader.iter():
                 count += 1
                 start_time = time.time()
-
-                loss, _, rnn_state, gradient_norm, step, _ = session.run([
-                    train_model.loss,
-                    train_model.train_op,
-                    train_model.final_rnn_state,
-                    train_model.global_norm,
-                    train_model.global_step,
-                    train_model.clear_char_embedding_padding
-                ], {
-                    train_model.input  : x,
-                    train_model.targets: y,
-                    train_model.initial_rnn_state: rnn_state
-                })
+                if fasttext_model:
+                    ft_vectors = fasttext_model.wv[words['train'][count]].reshape(fasttext_model.wv.vector_size, 1)
+                    loss, _, rnn_state, gradient_norm, step, _ = session.run([
+                        train_model.loss,
+                        train_model.train_op,
+                        train_model.final_rnn_state,
+                        train_model.global_norm,
+                        train_model.global_step,
+                        train_model.clear_char_embedding_padding
+                    ], {
+                        train_model.input2: ft_vectors,
+                        train_model.input  : x,
+                        train_model.targets: y,
+                        train_model.initial_rnn_state: rnn_state
+                    })
+                else:
+                    loss, _, rnn_state, gradient_norm, step, _ = session.run([
+                        train_model.loss,
+                        train_model.train_op,
+                        train_model.final_rnn_state,
+                        train_model.global_norm,
+                        train_model.global_step,
+                        train_model.clear_char_embedding_padding
+                    ], {
+                        train_model.input: x,
+                        train_model.targets: y,
+                        train_model.initial_rnn_state: rnn_state
+                    })
 
                 avg_train_loss += 0.05 * (loss - avg_train_loss)
 
@@ -224,6 +250,7 @@ def main(print, embedding):
                     valid_model.loss,
                     valid_model.final_rnn_state
                 ], {
+                    valid_model.input2: words[count],
                     valid_model.input  : x,
                     valid_model.targets: y,
                     valid_model.initial_rnn_state: rnn_state,

@@ -21,22 +21,22 @@ def conv2d(input_, output_dim, k_h, k_w, name="conv2d"):
 
     return tf.nn.conv2d(input_, w, strides=[1, 1, 1, 1], padding='VALID') + b
 
-
-def linearFT(output_size, scope=None):
-
-    shape = tf.shape([300, 1])
-    if len(shape) != 2:
-        raise ValueError("Linear is expecting 2D arguments: %s" % str(shape))
-    if not shape[1]:
-        raise ValueError("Linear expects shape[1] of arguments: %s" % str(shape))
-    input_size = shape[1]
-
-    # Now the computation.
-    with tf.variable_scope(scope or "SimpleLinear"):
-        matrix = tf.get_variable("Matrix", [output_size, input_size], dtype='f')
-        bias_term = tf.get_variable("Bias", [output_size], dtype='f')
-
-    return tf.matmul(tf.transpose(matrix)) + bias_term
+#
+# def linearFT(output_size, scope=None):
+#
+#     shape = tf.shape([300, 1])
+#     if len(shape) != 2:
+#         raise ValueError("Linear is expecting 2D arguments: %s" % str(shape))
+#     if not shape[1]:
+#         raise ValueError("Linear expects shape[1] of arguments: %s" % str(shape))
+#     input_size = shape[1]
+#
+#     # Now the computation.
+#     with tf.variable_scope(scope or "SimpleLinear"):
+#         matrix = tf.get_variable("Matrix", [output_size, input_size], dtype='f')
+#         bias_term = tf.get_variable("Bias", [output_size], dtype='f')
+#
+#     return tf.matmul(tf.transpose(matrix)) + bias_term
 
 def linearFT(_input,output_size, scope=None):
     shape = _input.get_shape().as_list()
@@ -44,12 +44,12 @@ def linearFT(_input,output_size, scope=None):
         raise ValueError("Linear is expecting 2D arguments: %s" % str(shape))
     if not shape[1]:
         raise ValueError("Linear expects shape[1] of arguments: %s" % str(shape))
-    input_size = shape[1]
+    input_size = shape[0]
     # Now the computation.
     with tf.variable_scope(scope or "SimpleLinear"):
         matrix = tf.get_variable("Matrix", [output_size, input_size], dtype=tf.float32)
         bias_term = tf.get_variable("Bias", [output_size], dtype=tf.float32)
-    return tf.matmul(_input, tf.transpose(matrix)) + bias_term
+    return tf.matmul(tf.transpose(_input), tf.transpose(matrix)) + bias_term
 
 def linear(input_, output_size, scope=None):
     '''
@@ -152,7 +152,8 @@ def inference_graph(char_vocab_size, word_vocab_size,
                     kernel_features=[50, 100, 150, 200, 200, 200, 200],
                     num_unroll_steps=35,
                     dropout=0.0,
-                    embedding=['kim']):
+                    embedding=['kim'],
+                    fasttext_word_dim=300):
     assert len(kernels) == len(kernel_features), 'Kernel and Features must have the same size'
 
     input_ = tf.placeholder(tf.int32, shape=[batch_size, num_unroll_steps, max_word_length], name="input")
@@ -178,8 +179,10 @@ def inference_graph(char_vocab_size, word_vocab_size,
     # [batch_size x num_unroll_steps, cnn_size]  # where cnn_size=sum(kernel_features)
     input_cnn = tdnn(input_embedded, kernels, kernel_features)
 
-    if 'fastText' in embedding:
-        linearFT(tf.Dimension(1100), scope='fastTextFC')
+    if 'fasttext' in embedding:
+        input2_ = tf.placeholder(tf.float32, shape=[fasttext_word_dim,batch_size, num_unroll_steps], name="input2")
+        input2_ = tf.reshape(input2_, [fasttext_word_dim, -1])
+        linearFT(input2_, tf.Dimension(1100), scope='fastTextFC')
 
     ''' Maybe apply Highway '''
     if num_highway_layers > 0:
@@ -216,6 +219,7 @@ def inference_graph(char_vocab_size, word_vocab_size,
 
     return adict(
         input=input_,
+        input2=input2_,
         clear_char_embedding_padding=clear_char_embedding_padding,
         input_embedded=input_embedded,
         input_cnn=input_cnn,
