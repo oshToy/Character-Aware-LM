@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import model
-from data_reader import load_data, DataReader
+from data_reader import load_data, DataReader, DataReaderFastText
 
 FLAGS = tf.flags.FLAGS
 
@@ -69,6 +69,11 @@ def main(print, embedding):
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
 
+    # test_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
+    #                                     num_unroll_steps=FLAGS.num_unroll_steps,
+    #                                     model=fasttext_model,
+    #                                     data='test')
+    #
     print('initialized test dataset reader')
 
     with tf.Graph().as_default(), tf.Session() as session:

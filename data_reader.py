@@ -148,10 +148,10 @@ class DataReaderFastText:
         self.length = len(self._x_batches)
         self.batch_size = batch_size
         self.num_unroll_steps = num_unroll_steps
-
+        self.word_vector_size = word_vector_size
     def iter(self):
         for x in self._x_batches:
-            yield x
+            yield x.reshape(-1, self.word_vector_size).T
 
 
 class DataReader:

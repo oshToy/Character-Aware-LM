@@ -141,6 +141,12 @@ def tdnn(input_, kernels, kernel_features, scope='TDNN'):
     return output
 
 
+def merge_embedding(embedding_x, embedding_y, method):
+    if method == 'addition':
+        return tf.add(embedding_x, embedding_y)
+    return None
+
+
 def inference_graph(char_vocab_size, word_vocab_size,
                     char_embed_size=15,
                     batch_size=20,
@@ -172,7 +178,6 @@ def inference_graph(char_vocab_size, word_vocab_size,
 
         # [batch_size x max_word_length, num_unroll_steps, char_embed_size]
         input_embedded = tf.nn.embedding_lookup(char_embedding, input_)
-
         input_embedded = tf.reshape(input_embedded, [-1, max_word_length, char_embed_size])
 
     ''' Second, apply convolutions '''
@@ -182,7 +187,8 @@ def inference_graph(char_vocab_size, word_vocab_size,
     if 'fasttext' in embedding:
         input2_ = tf.placeholder(tf.float32, shape=[fasttext_word_dim,batch_size, num_unroll_steps], name="input2")
         input2_ = tf.reshape(input2_, [fasttext_word_dim, -1])
-        linearFT(input2_, tf.Dimension(1100), scope='fastTextFC')
+        input_mofified_ft = linearFT(input2_, tf.Dimension(1100), scope='fastTextFC')
+        input_cnn = merge_embedding(input_cnn,input_mofified_ft, r'addition')
 
     ''' Maybe apply Highway '''
     if num_highway_layers > 0:

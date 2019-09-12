@@ -101,16 +101,26 @@ def main(print, embedding):
     if 'fasttext' in embedding:
         fasttext_model = FasttextModel(fasttext_path=fasttext_model_path).get_fasttext_model()
 
-    train_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
-                                         num_unroll_steps=FLAGS.num_unroll_steps,
-                                         model=fasttext_model,
-                                         data='train')
+        train_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
+                                             num_unroll_steps=FLAGS.num_unroll_steps,
+                                             model=fasttext_model,
+                                             data='train')
+
+        valid_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
+                                             num_unroll_steps=FLAGS.num_unroll_steps,
+                                             model=fasttext_model,
+                                             data='valid')
+
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
 
+
+
     valid_reader = DataReader(word_tensors['valid'], char_tensors['valid'],
+
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
+
 
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
                              FLAGS.batch_size, FLAGS.num_unroll_steps)
@@ -197,7 +207,8 @@ def main(print, embedding):
             epoch_start_time = time.time()
             avg_train_loss = 0.0
             count = 0
-            for x, y in train_reader.iter():
+            for batch_kim, batch_ft in zip(train_reader.iter(), train_ft_reader.iter()):
+                x, y = batch_kim
                 count += 1
                 start_time = time.time()
                 if fasttext_model:
@@ -210,7 +221,7 @@ def main(print, embedding):
                         train_model.global_step,
                         train_model.clear_char_embedding_padding
                     ], {
-                        train_model.input2: ft_vectors,
+                        train_model.input2: batch_ft,
                         train_model.input: x,
                         train_model.targets: y,
                         train_model.initial_rnn_state: rnn_state
@@ -251,7 +262,8 @@ def main(print, embedding):
             avg_valid_loss = 0.0
             count = 0
             rnn_state = session.run(valid_model.initial_rnn_state)
-            for x, y in valid_reader.iter():
+            for batch_kim, batch_ft in zip(valid_reader.iter(), valid_ft_reader.iter()):
+                x, y = batch_kim
                 count += 1
                 start_time = time.time()
 
@@ -259,7 +271,7 @@ def main(print, embedding):
                     valid_model.loss,
                     valid_model.final_rnn_state
                 ], {
-                    valid_model.input2: words_list[count],
+                    valid_model.input2: batch_ft,
                     valid_model.input: x,
                     valid_model.targets: y,
                     valid_model.initial_rnn_state: rnn_state,
