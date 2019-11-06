@@ -35,7 +35,7 @@ def define_flags():
     flags.DEFINE_float('param_init', 0.05, 'initialize parameters at')
     flags.DEFINE_integer('num_unroll_steps', 35, 'number of timesteps to unroll for')
     flags.DEFINE_integer('batch_size', 20, 'number of sequences to train on in parallel')
-    flags.DEFINE_integer('max_epochs', 30, 'number of full passes through the training data')
+    flags.DEFINE_integer('max_epochs', 1, 'number of full passes through the training data')
     flags.DEFINE_float('max_grad_norm', 5.0, 'normalize gradients at')
     flags.DEFINE_integer('max_word_length', 65, 'maximum word length')
 
@@ -79,9 +79,8 @@ def initialize_epoch_data_dict():
     }
 
 
-def main(print, embedding):
+def main(print):
     ''' Trains model from data '''
-    define_flags()
     if not os.path.exists(FLAGS.train_dir):
         os.mkdir(FLAGS.train_dir)
         print('Created training directory' + FLAGS.train_dir)
@@ -98,7 +97,7 @@ def main(print, embedding):
         load_data(FLAGS.data_dir, FLAGS.max_word_length, eos=FLAGS.EOS)
 
     fasttext_model = None
-    if 'fasttext' in embedding:
+    if 'fasttext' in FLAGS.embedding:
         fasttext_model = FasttextModel(fasttext_path=fasttext_model_path).get_fasttext_model()
 
         train_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
@@ -149,7 +148,7 @@ def main(print, embedding):
                 kernel_features=eval(FLAGS.kernel_features),
                 num_unroll_steps=FLAGS.num_unroll_steps,
                 dropout=FLAGS.dropout,
-                embedding=embedding,
+                embedding=FLAGS.embedding,
                 fasttext_word_dim=300)
             train_model.update(model.loss_graph(train_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
@@ -178,7 +177,7 @@ def main(print, embedding):
                 kernel_features=eval(FLAGS.kernel_features),
                 num_unroll_steps=FLAGS.num_unroll_steps,
                 dropout=0.0,
-                embedding=embedding,
+                embedding=FLAGS.embedding,
                 fasttext_word_dim=300)
             valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 

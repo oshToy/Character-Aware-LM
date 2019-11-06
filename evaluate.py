@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import model
-from data_reader import load_data, DataReader, DataReaderFastText
+from data_reader import load_data, DataReader, DataReaderFastText, FasttextModel
 
 FLAGS = tf.flags.FLAGS
 
@@ -43,6 +43,8 @@ def initialize_epoch_data_dict():
     }
 
 def save_data_to_csv(avg_loss,count,time_elapsed):
+    if not os.path.exists(FLAGS.train_dir):
+        os.makedirs(FLAGS.train_dir)
     pd.DataFrame(FLAGS.flag_values_dict(), index=range(1)).to_csv(FLAGS.train_dir + '/test_parameters.csv')
     test_results = initialize_epoch_data_dict()
 
@@ -53,7 +55,7 @@ def save_data_to_csv(avg_loss,count,time_elapsed):
     test_results["time_per_batch"].append(time_elapsed / count)
 
     pd.DataFrame(test_results, index=range(1)).to_csv(FLAGS.train_dir + '/test_results.csv')
-def main(print, embedding):
+def main(print):
     ''' Loads trained model and evaluates it on test split '''
     if FLAGS.load_model_for_test is None:
         print('Please specify checkpoint file to load model from')
@@ -63,17 +65,23 @@ def main(print, embedding):
         print('Checkpoint file not found', FLAGS.load_model_for_test)
         return -1
 
-    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
+    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list = \
         load_data(FLAGS.data_dir, FLAGS.max_word_length, eos=FLAGS.EOS)
 
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
 
-    # test_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
-    #                                     num_unroll_steps=FLAGS.num_unroll_steps,
-    #                                     model=fasttext_model,
-    #                                     data='test')
-    #
+    fasttext_model_path = None
+    if FLAGS.fasttext_model_path:
+        fasttext_model_path = FLAGS.fasttext_model_path
+
+    if 'fasttext' in FLAGS.embedding:
+        fasttext_model = FasttextModel(fasttext_path=fasttext_model_path).get_fasttext_model()
+        test_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
+                                            num_unroll_steps=FLAGS.num_unroll_steps,
+                                            model=fasttext_model,
+                                            data='test')
+
     print('initialized test dataset reader')
 
     with tf.Graph().as_default(), tf.Session() as session:
@@ -97,7 +105,7 @@ def main(print, embedding):
                     kernel_features=eval(FLAGS.kernel_features),
                     num_unroll_steps=FLAGS.num_unroll_steps,
                     dropout=0,
-                    embedding=embedding,
+                    embedding=FLAGS.embedding,
                     fasttext_word_dim=300)
             m.update(model.loss_graph(m.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
@@ -112,12 +120,14 @@ def main(print, embedding):
         count = 0
         avg_loss = 0
         start_time = time.time()
-        for x, y in test_reader.iter():
+        for batch_kim, batch_ft in zip(test_reader.iter(), test_ft_reader.iter()):
             count += 1
+            x, y = batch_kim
             loss, rnn_state = session.run([
                 m.loss,
                 m.final_rnn_state
             ], {
+                m.input2: batch_ft,
                 m.input  : x,
                 m.targets: y,
                 m.initial_rnn_state: rnn_state

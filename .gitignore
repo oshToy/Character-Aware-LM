@@ -18,3 +18,10 @@ logs/data_sets2019-08-02 14_18_23_754464.log
 *.data-00000-of-00001
 *.log
 *.csv
+*.pyc
+trained_models/AMI_2019-09-11--19-48-14/checkpoint
+trained_models/AMI_2019-09-12--08-50-34/checkpoint
+trained_models/AMI_2019-09-13--13-16-00/checkpoint
+*.GPU-STUD-06
+*.GPU-STUD-11
+*.xml

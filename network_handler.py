@@ -1,6 +1,6 @@
 import logging
 import os
-from train import main as train
+from train import main as train ,define_flags
 from evaluate import main as test
 import datetime
 import json
@@ -45,26 +45,28 @@ def main():
 
         flags.DEFINE_string('data_dir', data_sets_folder + '/' + data_set,
                             'data directory. Should contain train.txt/valid.txt/test.txt with input data')
+
+
         trained_model_folder = trained_models_folder + '/' + data_set + '_' + str(datetime.datetime.now().strftime('%Y-%m-%d--%H-%M-%S'))
         flags.DEFINE_string('train_dir', trained_model_folder, 'training directory (models and summaries are saved there periodically)')
         flags.DEFINE_string('fasttext_model_path', fasttext_model_path, 'fasttext trained model path')
+        flags.DEFINE_string('embedding', model['embedding'], 'embedding method')
 
+        define_flags()
         if model['training']:
-            embedding = list(model['embedding'])
-            train(logger, embedding)
+            train(logger)
         if model['testing']:
             checkpoint_file = checkpoint_file_from_number(model, trained_model_folder, logger)
             logger("test on model file : " + str(checkpoint_file))
             if not checkpoint_file:
                 break
             checkpoint_file = checkpoint_file.replace(".index", "")
-            tf.flags.DEFINE_string('load_model_for_test', trained_model_folder + '/' + checkpoint_file,
+            tf.flags.DEFINE_string('load_model_for_test',  checkpoint_file,
                                    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
-            test(logger, embedding)
+            test(logger)
 
 
-def checkpoint_file_from_number(model,trained_model_folder,print):
-    #epoch011_4.4827.model.index
+def checkpoint_file_from_number(model,trained_model_folder):
     if model["checkpoint_file_for_test"]:
         return model["checkpoint_file_for_test"]
 
@@ -78,12 +80,12 @@ def checkpoint_file_from_number(model,trained_model_folder,print):
         last_checkpoint_number = max(index_numbers_list)
         for file in files_list:
             if ".index" in file and str(last_checkpoint_number) in  file.split('_')[0]:
-                return file
+                return trained_model_folder + file
 
     elif model['checkpoint_number_for_test_or_null_for_last_checkpoint']:
         for file in files_list:
             if ".index" in file and str(model['checkpoint_number_for_test_or_null_for_last_checkpoint']) in file.split('_')[0]:
-                return file
+                return trained_model_folder + file
         print("checkpoint_number_for_test: " + str(model['checkpoint_number_for_test_or_null_for_last_checkpoint']) + "Not Found")
         return None
     else:

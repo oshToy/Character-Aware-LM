@@ -5,14 +5,12 @@
 "models":[{
  "data_set": "AMI",
  "training": true,
- "testing": false,
+ "testing": true,
  "checkpoint_number_for_test_or_null_for_last_checkpoint": null,
  "checkpoint_file_for_test": null,
- "embedding":[
-  "kim",
-  "fasttext"
- ],
- "fasttext_model_path": "C:\\RNNLM Project\\Models\\Common Crawl\\Lower Case\\15 Epoch\\Common Crawl_epoch15.model"
+ "embedding": "kim fasttext"
+,
+ "fasttext_model_path": "E:\\RNNLM Project\\Models\\Wikipedia\\Lower Case\\15 Epoch\\Wikipedia_epoch15.model"
 }
 ]
 }
