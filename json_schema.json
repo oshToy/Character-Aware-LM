@@ -11,6 +11,7 @@
     "trained_models_folder": {
       "type": "string"
     },
+
     "models": {
       "type": "array",
       "items": [
@@ -36,6 +37,9 @@
 
             "embedding": {
               "type": "array"
+            },
+            "fasttext_model_path": {
+              "type": "string"
             }
           },
           "required": [
@@ -44,7 +48,8 @@
             "testing",
             "checkpoint_number_for_test_or_null_for_last_checkpoint",
             "checkpoint_file_for_test",
-            "embedding"
+            "embedding",
+            "fasttext_model_path"
           ]
         }
       ]

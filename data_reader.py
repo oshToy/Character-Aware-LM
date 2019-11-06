@@ -5,6 +5,8 @@ import os
 import codecs
 import collections
 import numpy as np
+from gensim.models import FastText
+
 
 
 class Vocab:
@@ -51,7 +53,6 @@ class Vocab:
 
 
 def load_data(data_dir, max_word_length, eos='+'):
-
     char_vocab = Vocab()
     char_vocab.feed(' ')  # blank is at index 0 in char vocab
     char_vocab.feed('{')  # start is at index 1 in char vocab
@@ -64,8 +65,9 @@ def load_data(data_dir, max_word_length, eos='+'):
 
     word_tokens = collections.defaultdict(list)
     char_tokens = collections.defaultdict(list)
-
+    words = {}
     for fname in ('train', 'valid', 'test'):
+        words[fname] = list()
         print('reading', fname)
         with codecs.open(os.path.join(data_dir, fname + '.txt'), 'r', 'utf-8') as f:
             for line in f:
@@ -76,8 +78,9 @@ def load_data(data_dir, max_word_length, eos='+'):
                     line = line.replace(eos, '')
 
                 for word in line.split():
+                    words[fname].append(word)
                     if len(word) > max_word_length - 2:  # space for 'start' and 'end' chars
-                        word = word[:max_word_length-2]
+                        word = word[:max_word_length - 2]
 
                     word_tokens[fname].append(word_vocab.feed(word))
 
@@ -112,9 +115,43 @@ def load_data(data_dir, max_word_length, eos='+'):
         char_tensors[fname] = np.zeros([len(char_tokens[fname]), actual_max_word_length], dtype=np.int32)
 
         for i, char_array in enumerate(char_tokens[fname]):
-            char_tensors[fname] [i,:len(char_array)] = char_array
+            char_tensors[fname][i, :len(char_array)] = char_array
 
-    return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length
+    return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length, words
+
+
+class FasttextModel:
+    def __init__(self,fasttext_path=None):
+        self.fasttext_model = FastText.load(fasttext_path)
+
+    def get_fasttext_model(self):
+        return self.fasttext_model
+
+
+class DataReaderFastText:
+
+    def __init__(self, words_list, batch_size, num_unroll_steps, model, data):
+        length = len(words_list[data])
+        word_vector_size = model.vector_size
+
+        # round down length to whole number of slices
+        reduced_length = (length // (batch_size * num_unroll_steps)) * batch_size * num_unroll_steps
+        words_list[data] = words_list[data][:reduced_length]
+
+        words_vectors_tensor = model.wv[words_list[data]]
+
+        x_batches = words_vectors_tensor.reshape([batch_size, -1, num_unroll_steps, word_vector_size])
+
+        x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
+
+        self._x_batches = list(x_batches)
+        self.length = len(self._x_batches)
+        self.batch_size = batch_size
+        self.num_unroll_steps = num_unroll_steps
+        self.word_vector_size = word_vector_size
+    def iter(self):
+        for x in self._x_batches:
+            yield x.reshape(-1, self.word_vector_size).T
 
 
 class DataReader:
@@ -132,6 +169,7 @@ class DataReader:
         char_tensor = char_tensor[:reduced_length, :]
 
         ydata = np.zeros_like(word_tensor)
+        # shift left
         ydata[:-1] = word_tensor[1:].copy()
         ydata[-1] = word_tensor[0].copy()
 
@@ -149,14 +187,13 @@ class DataReader:
         self.num_unroll_steps = num_unroll_steps
 
     def iter(self):
-
         for x, y in zip(self._x_batches, self._y_batches):
             yield x, y
 
 
 if __name__ == '__main__':
 
-    _, _, wt, ct, _ = load_data('data', 65)
+    _, _, wt, ct, _, _ = load_data('data', 65)
     print(wt.keys())
 
     count = 0

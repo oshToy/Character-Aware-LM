@@ -8,41 +8,42 @@ import numpy as np
 import tensorflow as tf
 
 import model
-from data_reader import load_data, DataReader
+from data_reader import load_data, DataReader, FasttextModel, DataReaderFastText
 import pandas as pd
 
 flags = tf.flags
 FLAGS = flags.FLAGS
 
+
 def define_flags():
     # data
-    flags.DEFINE_string('load_model_for_training',   None,    '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+    flags.DEFINE_string('load_model_for_training', None,
+                        '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
     # model params
-    flags.DEFINE_integer('rnn_size',        650,                            'size of LSTM internal state')
-    flags.DEFINE_integer('highway_layers',  2,                              'number of highway layers')
-    flags.DEFINE_integer('char_embed_size', 15,                             'dimensionality of character embeddings')
-    flags.DEFINE_string ('kernels',         '[1,2,3,4,5,6,7]',              'CNN kernel widths')
-    flags.DEFINE_string ('kernel_features', '[50,100,150,200,200,200,200]', 'number of features in the CNN kernel')
-    flags.DEFINE_integer('rnn_layers',      2,                              'number of layers in the LSTM')
-    flags.DEFINE_float  ('dropout',         0.5,                            'dropout. 0 = no dropout')
+    flags.DEFINE_integer('rnn_size', 650, 'size of LSTM internal state')
+    flags.DEFINE_integer('highway_layers', 2, 'number of highway layers')
+    flags.DEFINE_integer('char_embed_size', 15, 'dimensionality of character embeddings')
+    flags.DEFINE_string('kernels', '[1,2,3,4,5,6,7]', 'CNN kernel widths')
+    flags.DEFINE_string('kernel_features', '[50,100,150,200,200,200,200]', 'number of features in the CNN kernel')
+    flags.DEFINE_integer('rnn_layers', 2, 'number of layers in the LSTM')
+    flags.DEFINE_float('dropout', 0.5, 'dropout. 0 = no dropout')
 
     # optimization
-    flags.DEFINE_float  ('learning_rate_decay', 0.5,  'learning rate decay')
-    flags.DEFINE_float  ('learning_rate',       1.0,  'starting learning rate')
-    flags.DEFINE_float  ('decay_when',          1.0,  'decay if validation perplexity does not improve by more than this much')
-    flags.DEFINE_float  ('param_init',          0.05, 'initialize parameters at')
-    flags.DEFINE_integer('num_unroll_steps',    35,   'number of timesteps to unroll for')
-    flags.DEFINE_integer('batch_size',          20,   'number of sequences to train on in parallel')
-    flags.DEFINE_integer('max_epochs',          30,   'number of full passes through the training data')
-    flags.DEFINE_float  ('max_grad_norm',       5.0,  'normalize gradients at')
-    flags.DEFINE_integer('max_word_length',     65,   'maximum word length')
+    flags.DEFINE_float('learning_rate_decay', 0.5, 'learning rate decay')
+    flags.DEFINE_float('learning_rate', 1.0, 'starting learning rate')
+    flags.DEFINE_float('decay_when', 1.0, 'decay if validation perplexity does not improve by more than this much')
+    flags.DEFINE_float('param_init', 0.05, 'initialize parameters at')
+    flags.DEFINE_integer('num_unroll_steps', 35, 'number of timesteps to unroll for')
+    flags.DEFINE_integer('batch_size', 20, 'number of sequences to train on in parallel')
+    flags.DEFINE_integer('max_epochs', 1, 'number of full passes through the training data')
+    flags.DEFINE_float('max_grad_norm', 5.0, 'normalize gradients at')
+    flags.DEFINE_integer('max_word_length', 65, 'maximum word length')
 
     # bookkeeping
-    flags.DEFINE_integer('seed',           3435, 'random number generator seed')
-    flags.DEFINE_integer('print_every',    5,    'how often to print current loss')
-    flags.DEFINE_string ('EOS',            '+',  '<EOS> symbol. should be a single unused character (like +) for PTB and blank for others')
-
-
+    flags.DEFINE_integer('seed', 3435, 'random number generator seed')
+    flags.DEFINE_integer('print_every', 5, 'how often to print current loss')
+    flags.DEFINE_string('EOS', '+',
+                        '<EOS> symbol. should be a single unused character (like +) for PTB and blank for others')
 
 
 def run_test(session, m, data, batch_size, num_steps):
@@ -66,21 +67,20 @@ def run_test(session, m, data, batch_size, num_steps):
 
 
 def initialize_epoch_data_dict():
-            return {
-                'epoch_number': list(),
-                'train_loss': list(),
-                'train_perplexity': list(),
-                'validation_loss': list(),
-                'valid_perplexity': list(),
-                "epoch_training_time": list(),
-                "model_name": list(),
-                "learning_rate": list()
-            }
+    return {
+        'epoch_number': list(),
+        'train_loss': list(),
+        'train_perplexity': list(),
+        'validation_loss': list(),
+        'valid_perplexity': list(),
+        "epoch_training_time": list(),
+        "model_name": list(),
+        "learning_rate": list()
+    }
 
 
-def main(print, embedding):
+def main(print):
     ''' Trains model from data '''
-    define_flags()
     if not os.path.exists(FLAGS.train_dir):
         os.mkdir(FLAGS.train_dir)
         print('Created training directory' + FLAGS.train_dir)
@@ -89,17 +89,40 @@ def main(print, embedding):
     pd.DataFrame(FLAGS.flag_values_dict(), index=range(1)).to_csv(FLAGS.train_dir + '/train_parameters.csv')
     epochs_results = initialize_epoch_data_dict()
 
-    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length = \
+    fasttext_model_path = None
+    if FLAGS.fasttext_model_path:
+        fasttext_model_path = FLAGS.fasttext_model_path
+
+    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list = \
         load_data(FLAGS.data_dir, FLAGS.max_word_length, eos=FLAGS.EOS)
+
+    fasttext_model = None
+    if 'fasttext' in FLAGS.embedding:
+        fasttext_model = FasttextModel(fasttext_path=fasttext_model_path).get_fasttext_model()
+
+        train_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
+                                             num_unroll_steps=FLAGS.num_unroll_steps,
+                                             model=fasttext_model,
+                                             data='train')
+
+        valid_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
+                                             num_unroll_steps=FLAGS.num_unroll_steps,
+                                             model=fasttext_model,
+                                             data='valid')
+
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
 
+
+
     valid_reader = DataReader(word_tensors['valid'], char_tensors['valid'],
+
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
 
+
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
-                              FLAGS.batch_size, FLAGS.num_unroll_steps)
+                             FLAGS.batch_size, FLAGS.num_unroll_steps)
 
     print('initialized all dataset readers')
 
@@ -113,19 +136,20 @@ def main(print, embedding):
         initializer = tf.random_uniform_initializer(-FLAGS.param_init, FLAGS.param_init)
         with tf.variable_scope("Model", initializer=initializer):
             train_model = model.inference_graph(
-                    char_vocab_size=char_vocab.size,
-                    word_vocab_size=word_vocab.size,
-                    char_embed_size=FLAGS.char_embed_size,
-                    batch_size=FLAGS.batch_size,
-                    num_highway_layers=FLAGS.highway_layers,
-                    num_rnn_layers=FLAGS.rnn_layers,
-                    rnn_size=FLAGS.rnn_size,
-                    max_word_length=max_word_length,
-                    kernels=eval(FLAGS.kernels),
-                    kernel_features=eval(FLAGS.kernel_features),
-                    num_unroll_steps=FLAGS.num_unroll_steps,
-                    dropout=FLAGS.dropout,
-                    embedding=embedding)
+                char_vocab_size=char_vocab.size,
+                word_vocab_size=word_vocab.size,
+                char_embed_size=FLAGS.char_embed_size,
+                batch_size=FLAGS.batch_size,
+                num_highway_layers=FLAGS.highway_layers,
+                num_rnn_layers=FLAGS.rnn_layers,
+                rnn_size=FLAGS.rnn_size,
+                max_word_length=max_word_length,
+                kernels=eval(FLAGS.kernels),
+                kernel_features=eval(FLAGS.kernel_features),
+                num_unroll_steps=FLAGS.num_unroll_steps,
+                dropout=FLAGS.dropout,
+                embedding=FLAGS.embedding,
+                fasttext_word_dim=300)
             train_model.update(model.loss_graph(train_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
             # scaling loss by FLAGS.num_unroll_steps effectively scales gradients by the same factor.
@@ -133,7 +157,7 @@ def main(print, embedding):
             # much smaller (i.e. 35 times smaller) and to get system to learn we'd have to scale learning rate and max_grad_norm appropriately.
             # Thus, scaling gradients so that this trainer is exactly compatible with the original
             train_model.update(model.training_graph(train_model.loss * FLAGS.num_unroll_steps,
-                    FLAGS.learning_rate, FLAGS.max_grad_norm))
+                                                    FLAGS.learning_rate, FLAGS.max_grad_norm))
 
         # create saver before creating more graph nodes, so that we do not save any vars defined below
         saver = tf.train.Saver(max_to_keep=50)
@@ -141,28 +165,31 @@ def main(print, embedding):
         ''' build graph for validation and testing (shares parameters with the training graph!) '''
         with tf.variable_scope("Model", reuse=True):
             valid_model = model.inference_graph(
-                    char_vocab_size=char_vocab.size,
-                    word_vocab_size=word_vocab.size,
-                    char_embed_size=FLAGS.char_embed_size,
-                    batch_size=FLAGS.batch_size,
-                    num_highway_layers=FLAGS.highway_layers,
-                    num_rnn_layers=FLAGS.rnn_layers,
-                    rnn_size=FLAGS.rnn_size,
-                    max_word_length=max_word_length,
-                    kernels=eval(FLAGS.kernels),
-                    kernel_features=eval(FLAGS.kernel_features),
-                    num_unroll_steps=FLAGS.num_unroll_steps,
-                    dropout=0.0)
+                char_vocab_size=char_vocab.size,
+                word_vocab_size=word_vocab.size,
+                char_embed_size=FLAGS.char_embed_size,
+                batch_size=FLAGS.batch_size,
+                num_highway_layers=FLAGS.highway_layers,
+                num_rnn_layers=FLAGS.rnn_layers,
+                rnn_size=FLAGS.rnn_size,
+                max_word_length=max_word_length,
+                kernels=eval(FLAGS.kernels),
+                kernel_features=eval(FLAGS.kernel_features),
+                num_unroll_steps=FLAGS.num_unroll_steps,
+                dropout=0.0,
+                embedding=FLAGS.embedding,
+                fasttext_word_dim=300)
             valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
         if FLAGS.load_model_for_training:
             saver.restore(session, FLAGS.load_model_for_training)
-            string = str('Loaded model from'+ str(FLAGS.load_model_for_training)+ 'saved at global step'+str(train_model.global_step.eval()))
+            string = str('Loaded model from' + str(FLAGS.load_model_for_training) + 'saved at global step' + str(
+                train_model.global_step.eval()))
             print(string)
         else:
             tf.global_variables_initializer().run()
             session.run(train_model.clear_char_embedding_padding)
-            string = str('Created and initialized fresh model. Size:'+str(model.model_size()))
+            string = str('Created and initialized fresh model. Size:' + str(model.model_size()))
             print(string)
         summary_writer = tf.summary.FileWriter(FLAGS.train_dir, graph=session.graph)
 
@@ -179,44 +206,63 @@ def main(print, embedding):
             epoch_start_time = time.time()
             avg_train_loss = 0.0
             count = 0
-            for x, y in train_reader.iter():
+            for batch_kim, batch_ft in zip(train_reader.iter(), train_ft_reader.iter()):
+                x, y = batch_kim
                 count += 1
                 start_time = time.time()
-
-                loss, _, rnn_state, gradient_norm, step, _ = session.run([
-                    train_model.loss,
-                    train_model.train_op,
-                    train_model.final_rnn_state,
-                    train_model.global_norm,
-                    train_model.global_step,
-                    train_model.clear_char_embedding_padding
-                ], {
-                    train_model.input  : x,
-                    train_model.targets: y,
-                    train_model.initial_rnn_state: rnn_state
-                })
+                if fasttext_model:
+                    ft_vectors = fasttext_model.wv[words_list['train'][count]].reshape(fasttext_model.wv.vector_size, 1)
+                    loss, _, rnn_state, gradient_norm, step, _ = session.run([
+                        train_model.loss,
+                        train_model.train_op,
+                        train_model.final_rnn_state,
+                        train_model.global_norm,
+                        train_model.global_step,
+                        train_model.clear_char_embedding_padding
+                    ], {
+                        train_model.input2: batch_ft,
+                        train_model.input: x,
+                        train_model.targets: y,
+                        train_model.initial_rnn_state: rnn_state
+                    })
+                else:
+                    loss, _, rnn_state, gradient_norm, step, _ = session.run([
+                        train_model.loss,
+                        train_model.train_op,
+                        train_model.final_rnn_state,
+                        train_model.global_norm,
+                        train_model.global_step,
+                        train_model.clear_char_embedding_padding
+                    ], {
+                        train_model.input: x,
+                        train_model.targets: y,
+                        train_model.initial_rnn_state: rnn_state
+                    })
 
                 avg_train_loss += 0.05 * (loss - avg_train_loss)
 
                 time_elapsed = time.time() - start_time
 
                 if count % FLAGS.print_every == 0:
-                    string = str('%6d: %d [%5d/%5d], train_loss/perplexity = %6.8f/%6.7f secs/batch = %.4fs, grad.norm=%6.8f' % (step,
-                                                            epoch, count,
-                                                            train_reader.length,
-                                                            loss, np.exp(loss),
-                                                            time_elapsed,
-                                                            gradient_norm))
+                    string = str(
+                        '%6d: %d [%5d/%5d], train_loss/perplexity = %6.8f/%6.7f secs/batch = %.4fs, grad.norm=%6.8f' % (
+                            step,
+                            epoch, count,
+                            train_reader.length,
+                            loss, np.exp(loss),
+                            time_elapsed,
+                            gradient_norm))
                     print(string)
-            string = str('Epoch training time:' + str(time.time()-epoch_start_time))
+            string = str('Epoch training time:' + str(time.time() - epoch_start_time))
             print(string)
-            epochs_results['epoch_training_time'].append(str(time.time()-epoch_start_time))
+            epochs_results['epoch_training_time'].append(str(time.time() - epoch_start_time))
 
             # epoch done: time to evaluate
             avg_valid_loss = 0.0
             count = 0
             rnn_state = session.run(valid_model.initial_rnn_state)
-            for x, y in valid_reader.iter():
+            for batch_kim, batch_ft in zip(valid_reader.iter(), valid_ft_reader.iter()):
+                x, y = batch_kim
                 count += 1
                 start_time = time.time()
 
@@ -224,7 +270,8 @@ def main(print, embedding):
                     valid_model.loss,
                     valid_model.final_rnn_state
                 ], {
-                    valid_model.input  : x,
+                    valid_model.input2: batch_ft,
+                    valid_model.input: x,
                     valid_model.targets: y,
                     valid_model.initial_rnn_state: rnn_state,
                 })
@@ -272,7 +319,6 @@ def main(print, embedding):
                 print(string)
             else:
                 best_valid_loss = avg_valid_loss
-
 
     # Save model performance data
     pd.DataFrame(epochs_results).to_csv(FLAGS.train_dir + '/train_results.csv')
