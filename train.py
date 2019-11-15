@@ -35,7 +35,7 @@ def define_flags():
     flags.DEFINE_float('param_init', 0.05, 'initialize parameters at')
     flags.DEFINE_integer('num_unroll_steps', 35, 'number of timesteps to unroll for')
     flags.DEFINE_integer('batch_size', 20, 'number of sequences to train on in parallel')
-    flags.DEFINE_integer('max_epochs', 1, 'number of full passes through the training data')
+    flags.DEFINE_integer('max_epochs', 25, 'number of full passes through the training data')
     flags.DEFINE_float('max_grad_norm', 5.0, 'normalize gradients at')
     flags.DEFINE_integer('max_word_length', 65, 'maximum word length')
 
@@ -110,16 +110,16 @@ def main(print):
                                              model=fasttext_model,
                                              data='valid')
 
+    kim_model = False
+
+    if 'kim' in FLAGS.embedding:
+        kim_model = True
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
 
-
-
     valid_reader = DataReader(word_tensors['valid'], char_tensors['valid'],
-
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
-
 
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
                              FLAGS.batch_size, FLAGS.num_unroll_steps)
@@ -188,7 +188,8 @@ def main(print):
             print(string)
         else:
             tf.global_variables_initializer().run()
-            session.run(train_model.clear_char_embedding_padding)
+            if kim_model:
+                session.run(train_model.clear_char_embedding_padding)
             string = str('Created and initialized fresh model. Size:' + str(model.model_size()))
             print(string)
         summary_writer = tf.summary.FileWriter(FLAGS.train_dir, graph=session.graph)
@@ -210,7 +211,7 @@ def main(print):
                 x, y = batch_kim
                 count += 1
                 start_time = time.time()
-                if fasttext_model:
+                if fasttext_model and kim_model:
                     ft_vectors = fasttext_model.wv[words_list['train'][count]].reshape(fasttext_model.wv.vector_size, 1)
                     loss, _, rnn_state, gradient_norm, step, _ = session.run([
                         train_model.loss,
@@ -225,7 +226,7 @@ def main(print):
                         train_model.targets: y,
                         train_model.initial_rnn_state: rnn_state
                     })
-                else:
+                elif kim_model:
                     loss, _, rnn_state, gradient_norm, step, _ = session.run([
                         train_model.loss,
                         train_model.train_op,
@@ -238,7 +239,18 @@ def main(print):
                         train_model.targets: y,
                         train_model.initial_rnn_state: rnn_state
                     })
-
+                elif fasttext_model:
+                    loss, _, rnn_state, gradient_norm, step = session.run([
+                        train_model.loss,
+                        train_model.train_op,
+                        train_model.final_rnn_state,
+                        train_model.global_norm,
+                        train_model.global_step,
+                    ], {
+                        train_model.input2: batch_ft,
+                        train_model.targets: y,
+                        train_model.initial_rnn_state: rnn_state
+                    })
                 avg_train_loss += 0.05 * (loss - avg_train_loss)
 
                 time_elapsed = time.time() - start_time
@@ -266,16 +278,34 @@ def main(print):
                 count += 1
                 start_time = time.time()
 
-                loss, rnn_state = session.run([
-                    valid_model.loss,
-                    valid_model.final_rnn_state
-                ], {
-                    valid_model.input2: batch_ft,
-                    valid_model.input: x,
-                    valid_model.targets: y,
-                    valid_model.initial_rnn_state: rnn_state,
-                })
-
+                if fasttext_model and kim_model:
+                    loss, rnn_state = session.run([
+                        valid_model.loss,
+                        valid_model.final_rnn_state
+                    ], {
+                        valid_model.input2: batch_ft,
+                        valid_model.input: x,
+                        valid_model.targets: y,
+                        valid_model.initial_rnn_state: rnn_state,
+                    })
+                elif kim_model:
+                    loss, rnn_state = session.run([
+                        valid_model.loss,
+                        valid_model.final_rnn_state
+                    ], {
+                        valid_model.input: x,
+                        valid_model.targets: y,
+                        valid_model.initial_rnn_state: rnn_state,
+                    })
+                elif fasttext_model:
+                    loss, rnn_state = session.run([
+                        valid_model.loss,
+                        valid_model.final_rnn_state
+                    ], {
+                        valid_model.input2: batch_ft,
+                        valid_model.targets: y,
+                        valid_model.initial_rnn_state: rnn_state,
+                    })
                 if count % FLAGS.print_every == 0:
                     string = str("\t> validation loss = %6.8f, perplexity = %6.8f" % (loss, np.exp(loss)))
                     print(string)
@@ -299,7 +329,10 @@ def main(print):
             ''' write out summary events '''
             summary = tf.Summary(value=[
                 tf.Summary.Value(tag="train_loss", simple_value=avg_train_loss),
-                tf.Summary.Value(tag="valid_loss", simple_value=avg_valid_loss)
+                tf.Summary.Value(tag="train_perplexity", simple_value=np.exp(avg_train_loss)),
+                tf.Summary.Value(tag="valid_loss", simple_value=avg_valid_loss),
+                tf.Summary.Value(tag="valid_perplexity", simple_value=np.exp(avg_valid_loss))
+
             ])
             summary_writer.add_summary(summary, step)
 

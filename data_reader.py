@@ -128,6 +128,7 @@ class FasttextModel:
         return self.fasttext_model
 
 
+
 class DataReaderFastText:
 
     def __init__(self, words_list, batch_size, num_unroll_steps, model, data):

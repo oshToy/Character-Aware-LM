@@ -4,6 +4,7 @@ from __future__ import division
 import tensorflow as tf
 import numpy as np
 
+
 class adict(dict):
     ''' Attribute dictionary - a convenience data structure, similar to SimpleNamespace in python 3.3
         One can use attributes to read/write dictionary content.
@@ -20,6 +21,7 @@ def conv2d(input_, output_dim, k_h, k_w, name="conv2d"):
         b = tf.get_variable('b', [output_dim])
 
     return tf.nn.conv2d(input_, w, strides=[1, 1, 1, 1], padding='VALID') + b
+
 
 #
 # def linearFT(output_size, scope=None):
@@ -38,7 +40,7 @@ def conv2d(input_, output_dim, k_h, k_w, name="conv2d"):
 #
 #     return tf.matmul(tf.transpose(matrix)) + bias_term
 
-def linearFT(_input,output_size, scope=None):
+def linearFT(_input, output_size, scope=None):
     shape = _input.get_shape().as_list()
     if len(shape) != 2:
         raise ValueError("Linear is expecting 2D arguments: %s" % str(shape))
@@ -50,6 +52,7 @@ def linearFT(_input,output_size, scope=None):
         matrix = tf.get_variable("Matrix", [output_size, input_size], dtype=tf.float32)
         bias_term = tf.get_variable("Bias", [output_size], dtype=tf.float32)
     return tf.matmul(tf.transpose(_input), tf.transpose(matrix)) + bias_term
+
 
 def linear(input_, output_size, scope=None):
     '''
@@ -79,12 +82,15 @@ def linear(input_, output_size, scope=None):
 
     return tf.matmul(input_, tf.transpose(matrix)) + bias_term
 
+
 def connection(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Embedding Connection'):
     '''
     connection between 2 types of embedding
     '''
     with tf.variable_scope(scope):
-     return
+        return
+
+
 def highway(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Highway'):
     """Highway Network (cf. http://arxiv.org/abs/1505.00387).
 
@@ -162,38 +168,45 @@ def inference_graph(char_vocab_size, word_vocab_size,
                     fasttext_word_dim=300):
     assert len(kernels) == len(kernel_features), 'Kernel and Features must have the same size'
 
-    input_ = tf.placeholder(tf.int32, shape=[batch_size, num_unroll_steps, max_word_length], name="input")
+    if 'kim' in embedding:
+        input_ = tf.placeholder(tf.int32, shape=[batch_size, num_unroll_steps, max_word_length], name="input")
 
-    ''' First, embed characters '''
-    with tf.variable_scope('Embedding'):
-        char_embedding = tf.get_variable('char_embedding', [char_vocab_size, char_embed_size])
+        ''' First, embed characters '''
+        with tf.variable_scope('Embedding'):
+            char_embedding = tf.get_variable('char_embedding', [char_vocab_size, char_embed_size])
 
-        ''' this op clears embedding vector of first symbol (symbol at position 0, which is by convention the position
-        of the padding symbol). It can be used to mimic Torch7 embedding operator that keeps padding mapped to
-        zero embedding vector and ignores gradient updates. For that do the following in TF:
-        1. after parameter initialization, apply this op to zero out padding embedding vector
-        2. after each gradient update, apply this op to keep padding at zero'''
-        clear_char_embedding_padding = tf.scatter_update(char_embedding, [0],
-                                                         tf.constant(0.0, shape=[1, char_embed_size]))
+            ''' this op clears embedding vector of first symbol (symbol at position 0, which is by convention the position
+            of the padding symbol). It can be used to mimic Torch7 embedding operator that keeps padding mapped to
+            zero embedding vector and ignores gradient updates. For that do the following in TF:
+            1. after parameter initialization, apply this op to zero out padding embedding vector
+            2. after each gradient update, apply this op to keep padding at zero'''
+            clear_char_embedding_padding = tf.scatter_update(char_embedding, [0],
+                                                             tf.constant(0.0, shape=[1, char_embed_size]))
 
-        # [batch_size x max_word_length, num_unroll_steps, char_embed_size]
-        input_embedded = tf.nn.embedding_lookup(char_embedding, input_)
-        input_embedded = tf.reshape(input_embedded, [-1, max_word_length, char_embed_size])
+            # [batch_size x max_word_length, num_unroll_steps, char_embed_size]
+            input_embedded = tf.nn.embedding_lookup(char_embedding, input_)
+            input_embedded = tf.reshape(input_embedded, [-1, max_word_length, char_embed_size])
 
-    ''' Second, apply convolutions '''
-    # [batch_size x num_unroll_steps, cnn_size]  # where cnn_size=sum(kernel_features)
-    input_cnn = tdnn(input_embedded, kernels, kernel_features)
+        ''' Second, apply convolutions '''
+        # [batch_size x num_unroll_steps, cnn_size]  # where cnn_size=sum(kernel_features)
+        input_cnn = tdnn(input_embedded, kernels, kernel_features)
+        input_for_highway = input_cnn
 
     if 'fasttext' in embedding:
-        input2_ = tf.placeholder(tf.float32, shape=[fasttext_word_dim,batch_size, num_unroll_steps], name="input2")
+        input2_ = tf.placeholder(tf.float32, shape=[fasttext_word_dim, batch_size, num_unroll_steps], name="input2")
         input2_ = tf.reshape(input2_, [fasttext_word_dim, -1])
         input_mofified_ft = linearFT(input2_, tf.Dimension(1100), scope='fastTextFC')
-        input_cnn = merge_embedding(input_cnn,input_mofified_ft, r'addition')
+        input_for_highway = input_mofified_ft
+
+    if 'fasttext' in embedding and 'kim' in embedding:
+        input_for_highway = merge_embedding(input_cnn, input_mofified_ft, r'addition')
+
 
     ''' Maybe apply Highway '''
     if num_highway_layers > 0:
-        input_cnn = highway(input_cnn, input_cnn.get_shape()[-1], num_layers=num_highway_layers)
+        input_for_highway = highway(input_for_highway, input_for_highway.get_shape()[-1], num_layers=num_highway_layers)
 
+    input_cnn = input_for_highway
     ''' Finally, do LSTM '''
     with tf.variable_scope('LSTM'):
         def create_rnn_cell():
@@ -222,19 +235,38 @@ def inference_graph(char_vocab_size, word_vocab_size,
                 if idx > 0:
                     scope.reuse_variables()
                 logits.append(linear(output, word_vocab_size))
-
-    return adict(
-        input=input_,
-        input2=input2_,
-        clear_char_embedding_padding=clear_char_embedding_padding,
-        input_embedded=input_embedded,
-        input_cnn=input_cnn,
-        initial_rnn_state=initial_rnn_state,
-        final_rnn_state=final_rnn_state,
-        rnn_outputs=outputs,
-        logits=logits
-    )
-
+    if 'fasttext' in embedding and 'kim' in embedding:
+        return adict(
+            input=input_,
+            input2=input2_,
+            clear_char_embedding_padding=clear_char_embedding_padding,
+            input_embedded=input_embedded,
+            input_cnn=input_cnn,
+            initial_rnn_state=initial_rnn_state,
+            final_rnn_state=final_rnn_state,
+            rnn_outputs=outputs,
+            logits=logits
+        )
+    elif 'fasttext' in embedding :
+        return adict(
+            input2=input2_,
+            input_cnn=input_cnn,
+            initial_rnn_state=initial_rnn_state,
+            final_rnn_state=final_rnn_state,
+            rnn_outputs=outputs,
+            logits=logits
+        )
+    elif 'kim' in embedding :
+        return adict(
+            input=input_,
+            clear_char_embedding_padding=clear_char_embedding_padding,
+            input_embedded=input_embedded,
+            input_cnn=input_cnn,
+            initial_rnn_state=initial_rnn_state,
+            final_rnn_state=final_rnn_state,
+            rnn_outputs=outputs,
+            logits=logits
+        )
 
 def loss_graph(logits, batch_size, num_unroll_steps):
     with tf.variable_scope('Loss'):

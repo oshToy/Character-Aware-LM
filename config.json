@@ -1,17 +1,19 @@
 {
-"logs_folder":"./logs/",
-"data_sets_folder":"./data_sets",
-"trained_models_folder":"./trained_models",
-"models":[{
- "data_set": "AMI",
- "training": true,
- "testing": true,
- "checkpoint_number_for_test_or_null_for_last_checkpoint": null,
- "checkpoint_file_for_test": null,
- "embedding": "kim fasttext"
-,
- "fasttext_model_path": "E:\\RNNLM Project\\Models\\Wikipedia\\Lower Case\\15 Epoch\\Wikipedia_epoch15.model"
-}
-]
+  "logs_folder": "./logs/",
+  "data_sets_folder": "./data_sets",
+  "trained_models_folder": "./trained_models",
+  "models": [
+    {
+      "data_set": "AMI",
+      "training": true,
+      "testing": false,
+      "checkpoint_number_for_test_or_null_for_last_checkpoint": null,
+      "checkpoint_file_for_test": null,
+      "embedding": [
+        "fasttext ami"
+      ],
+      "fasttext_model_path": "E:\\RNNLM Project\\Models\\Wikipedia\\Lower Case\\15 Epoch\\Wikipedia_epoch15.model"
+    }
+  ]
 }
 

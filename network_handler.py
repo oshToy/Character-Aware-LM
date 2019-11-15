@@ -50,7 +50,7 @@ def main():
         trained_model_folder = trained_models_folder + '/' + data_set + '_' + str(datetime.datetime.now().strftime('%Y-%m-%d--%H-%M-%S'))
         flags.DEFINE_string('train_dir', trained_model_folder, 'training directory (models and summaries are saved there periodically)')
         flags.DEFINE_string('fasttext_model_path', fasttext_model_path, 'fasttext trained model path')
-        flags.DEFINE_string('embedding', model['embedding'], 'embedding method')
+        flags.DEFINE_string('embedding', model['embedding'][0], 'embedding method')
 
         define_flags()
         if model['training']:
