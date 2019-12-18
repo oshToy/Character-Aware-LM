@@ -296,10 +296,13 @@ def main(print):
             epochs_results['model_name'].append(str(save_as))
             epochs_results['learning_rate'].append(str(session.run(train_model.learning_rate)))
 
+
             ''' write out summary events '''
             summary = tf.Summary(value=[
                 tf.Summary.Value(tag="train_loss", simple_value=avg_train_loss),
-                tf.Summary.Value(tag="valid_loss", simple_value=avg_valid_loss)
+                tf.Summary.Value(tag="train_perplexity", simple_value=np.exp(avg_train_loss)),
+                tf.Summary.Value(tag="valid_loss", simple_value=avg_valid_loss),
+                tf.Summary.Value(tag="valid_perplexity", simple_value=np.exp(avg_valid_loss)),
             ])
             summary_writer.add_summary(summary, step)
 
