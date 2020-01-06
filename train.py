@@ -15,17 +15,24 @@ flags = tf.flags
 FLAGS = flags.FLAGS
 
 
-def define_flags():
+def define_flags(data_dir, train_dir, fasttext_model_path, embedding, max_epochs=25, rnn_size=650, rnn_layers=1, highway_layers=2):
+    flags.DEFINE_string('data_dir', data_dir,
+                        'data directory. Should contain train.txt/valid.txt/test.txt with input data')
+    flags.DEFINE_string('train_dir', train_dir,
+                        'training directory (models and summaries are saved there periodically)')
+    flags.DEFINE_string('fasttext_model_path', fasttext_model_path, 'fasttext trained model path')
+    flags.DEFINE_string('embedding', embedding, 'embedding method')
+
     # data
     flags.DEFINE_string('load_model_for_training', None,
                         '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
     # model params
-    flags.DEFINE_integer('rnn_size', 650, 'size of LSTM internal state')
-    flags.DEFINE_integer('highway_layers', 2, 'number of highway layers')
+    flags.DEFINE_integer('rnn_size', rnn_size, 'size of LSTM internal state')
+    flags.DEFINE_integer('highway_layers', highway_layers, 'number of highway layers')
     flags.DEFINE_integer('char_embed_size', 15, 'dimensionality of character embeddings')
     flags.DEFINE_string('kernels', '[1,2,3,4,5,6,7]', 'CNN kernel widths')
     flags.DEFINE_string('kernel_features', '[50,100,150,200,200,200,200]', 'number of features in the CNN kernel')
-    flags.DEFINE_integer('rnn_layers', 2, 'number of layers in the LSTM')
+    flags.DEFINE_integer('rnn_layers', rnn_layers, 'number of layers in the LSTM')
     flags.DEFINE_float('dropout', 0.5, 'dropout. 0 = no dropout')
 
     # optimization
@@ -34,8 +41,8 @@ def define_flags():
     flags.DEFINE_float('decay_when', 1.0, 'decay if validation perplexity does not improve by more than this much')
     flags.DEFINE_float('param_init', 0.05, 'initialize parameters at')
     flags.DEFINE_integer('num_unroll_steps', 35, 'number of timesteps to unroll for')
-    flags.DEFINE_integer('batch_size', 20, 'number of sequences to train on in parallel')
-    flags.DEFINE_integer('max_epochs', 1, 'number of full passes through the training data')
+    flags.DEFINE_integer('batch_size', 25, 'number of sequences to train on in parallel')
+    flags.DEFINE_integer('max_epochs', max_epochs, 'number of full passes through the training data')
     flags.DEFINE_float('max_grad_norm', 5.0, 'normalize gradients at')
     flags.DEFINE_integer('max_word_length', 65, 'maximum word length')
 
@@ -110,16 +117,12 @@ def main(print):
                                              model=fasttext_model,
                                              data='valid')
 
-
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
-
-
 
     valid_reader = DataReader(word_tensors['valid'], char_tensors['valid'],
 
                               FLAGS.batch_size, FLAGS.num_unroll_steps)
-
 
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
                              FLAGS.batch_size, FLAGS.num_unroll_steps)
@@ -296,7 +299,6 @@ def main(print):
             epochs_results['model_name'].append(str(save_as))
             epochs_results['learning_rate'].append(str(session.run(train_model.learning_rate)))
 
-
             ''' write out summary events '''
             summary = tf.Summary(value=[
                 tf.Summary.Value(tag="train_loss", simple_value=avg_train_loss),
@@ -313,7 +315,7 @@ def main(print):
                 string = str('learning rate was:' + str(current_learning_rate))
                 print(string)
                 current_learning_rate *= FLAGS.learning_rate_decay
-                if current_learning_rate < 1.e-5:
+                if current_learning_rate < 1.e-3:
                     print('learning rate too small - stopping now')
                     break
 

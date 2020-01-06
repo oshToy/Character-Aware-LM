@@ -34,12 +34,28 @@
             "checkpoint_file_for_test": {
               "type": ["string", "null"]
             },
-
             "embedding": {
-              "type": "array"
+              "type": "string",
+              "default": "kim fasttext"
             },
             "fasttext_model_path": {
               "type": "string"
+            },
+            "max_epochs": {
+              "type": "integer",
+              "default": 25
+            },
+            "rnn_size": {
+              "type": "integer",
+              "default": 650
+            },
+            "rnn_layers": {
+              "type": "integer",
+              "default": 1
+            },
+            "highway_layers": {
+              "type": "integer",
+              "default": 2
             }
           },
           "required": [
@@ -49,7 +65,11 @@
             "checkpoint_number_for_test_or_null_for_last_checkpoint",
             "checkpoint_file_for_test",
             "embedding",
-            "fasttext_model_path"
+            "fasttext_model_path",
+            "max_epochs",
+            "rnn_size",
+            "rnn_layers",
+            "highway_layers"
           ]
         }
       ]

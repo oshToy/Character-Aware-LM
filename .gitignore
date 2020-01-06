@@ -7,18 +7,9 @@
 trained_models/PeenTreeBank/checkpoint
 *.GPU-STUD-OHAD
 trained_models/AMI_2019-08-02--14-24-14/checkpoint
-*.pyc
-*.pyc
-*.log
-*.log
-*.log
 logs/data_sets2019-08-02 14_18_23_754464.log
-*.log
-*.meta
 *.data-00000-of-00001
-*.log
 *.csv
-*.pyc
 trained_models/AMI_2019-09-11--19-48-14/checkpoint
 trained_models/AMI_2019-09-12--08-50-34/checkpoint
 trained_models/AMI_2019-09-13--13-16-00/checkpoint

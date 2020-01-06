@@ -188,6 +188,7 @@ def inference_graph(char_vocab_size, word_vocab_size,
         input2_ = tf.placeholder(tf.float32, shape=[fasttext_word_dim,batch_size, num_unroll_steps], name="input2")
         input2_ = tf.reshape(input2_, [fasttext_word_dim, -1])
         input_mofified_ft = linearFT(input2_, tf.Dimension(1100), scope='fastTextFC')
+        input_mofified_ft = tf.nn.relu(input_mofified_ft) #Added RELU to matrix after FT
         input_cnn = merge_embedding(input_cnn,input_mofified_ft, r'addition')
 
     ''' Maybe apply Highway '''

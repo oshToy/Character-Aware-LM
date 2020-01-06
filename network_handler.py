@@ -37,22 +37,25 @@ def main():
 
     for model in config_dict['models']:
         logger = logger_for_print(folder=logs_folder, file_name=config_dict['data_sets_folder'])
+
         fasttext_model_path = model['fasttext_model_path']
 
         #copy_data_files(data_folder=data_sets_folder + model['data_set'])
         data_set = model['data_set']
         del_all_flags(tf.flags.FLAGS)
-
-        flags.DEFINE_string('data_dir', data_sets_folder + '/' + data_set,
-                            'data directory. Should contain train.txt/valid.txt/test.txt with input data')
-
-
         trained_model_folder = trained_models_folder + '/' + data_set + '_' + str(datetime.datetime.now().strftime('%Y-%m-%d--%H-%M-%S'))
-        flags.DEFINE_string('train_dir', trained_model_folder, 'training directory (models and summaries are saved there periodically)')
-        flags.DEFINE_string('fasttext_model_path', fasttext_model_path, 'fasttext trained model path')
-        flags.DEFINE_string('embedding', model['embedding'], 'embedding method')
+        # define train cofidg with static and dynamic values from config.json
 
-        define_flags()
+        define_flags(
+            data_dir=data_sets_folder + '/' + data_set,
+            train_dir=trained_model_folder,
+            fasttext_model_path=fasttext_model_path,
+            embedding=model['embedding'],
+            max_epochs=model['max_epochs'],
+            rnn_size=model['rnn_size'],
+            rnn_layers=model['rnn_layers'],
+            highway_layers=model['highway_layers']
+        )
         if model['training']:
             train(logger)
         if model['testing']:
