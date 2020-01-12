@@ -214,14 +214,16 @@ def inference_graph(char_vocab_size, word_vocab_size,
 
         outputs, final_rnn_state = tf.contrib.rnn.static_rnn(cell, input_cnn2,
                                                              initial_state=initial_rnn_state, dtype=tf.float32)
+        #For WER
+        output = outputs[-1]
 
         # linear projection onto output (word) vocab
         logits = []
         with tf.variable_scope('WordEmbedding') as scope:
-            for idx, output in enumerate(outputs):
-                if idx > 0:
-                    scope.reuse_variables()
-                logits.append(linear(output, word_vocab_size))
+            # for idx, output in enumerate(outputs):
+            #     if idx > 0:
+            #         scope.reuse_variables()
+            logits.append(linear(output, word_vocab_size))
 
     return adict(
         input=input_,
@@ -236,14 +238,15 @@ def inference_graph(char_vocab_size, word_vocab_size,
     )
 
 
-def loss_graph(logits, batch_size, num_unroll_steps):
+def loss_graph(logits, batch_size):
     with tf.variable_scope('Loss'):
-        targets = tf.placeholder(tf.int64, [batch_size, num_unroll_steps], name='targets')
-        target_list = [tf.squeeze(x, [1]) for x in tf.split(targets, num_unroll_steps, 1)]
+        targets = tf.placeholder(tf.float32, [batch_size, 1], name='WER')
+        #target_list = [tf.squeeze(x, [1]) for x in tf.split(targets, num_unroll_steps, 1)]
 
-        loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=target_list),
-                              name='loss')
+        # loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=target_list),
+        #                       name='loss')
 
+        loss = tf.reduce_mean(tf.squared_difference(logits, targets), name='loss')
     return adict(
         targets=targets,
         loss=loss

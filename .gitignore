@@ -25,3 +25,4 @@ trained_models/AMI_2019-09-13--13-16-00/checkpoint
 *.GPU-STUD-06
 *.GPU-STUD-11
 *.xml
+*.txt

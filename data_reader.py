@@ -5,6 +5,7 @@ import os
 import codecs
 import collections
 import numpy as np
+import pandas as pd
 from gensim.models import FastText
 
 
@@ -52,32 +53,47 @@ class Vocab:
         return cls(token2index, index2token)
 
 
-def load_data(data_dir, max_word_length, eos='+'):
+def load_data(data_dir, max_word_length, num_unroll_steps, eos='+'):
     char_vocab = Vocab()
     char_vocab.feed(' ')  # blank is at index 0 in char vocab
     char_vocab.feed('{')  # start is at index 1 in char vocab
     char_vocab.feed('}')  # end   is at index 2 in char vocab
 
     word_vocab = Vocab()
-    word_vocab.feed('|')  # <unk> is at index 0 in word vocab
+    word_vocab.feed(' ')   # empty word for padding  at index 0 in word vocab
+    word_vocab.feed('|')  # <unk> is at index 1 in word vocab
 
     actual_max_word_length = 0
-
     word_tokens = collections.defaultdict(list)
     char_tokens = collections.defaultdict(list)
+    wers = {}
     words = {}
     for fname in ('train', 'valid', 'test'):
+        wers[fname] = pd.Series(name='wer')
         words[fname] = list()
         print('reading', fname)
-        with codecs.open(os.path.join(data_dir, fname + '.txt'), 'r', 'utf-8') as f:
-            for line in f:
-                line = line.strip()
-                line = line.replace('}', '').replace('{', '').replace('|', '')
-                line = line.replace('<unk>', ' | ')
+        # with codecs.open(os.path.join(data_dir, fname + '.txt'), 'r', 'utf-8') as f:
+        print(data_dir)
+        for file in os.listdir(os.path.join(data_dir, fname)):
+            df = pd.read_csv(os.path.join(data_dir, fname, file))
+            df = df.dropna()
+            print(str(df.shape))
+            wers[fname] = wers[fname].append(df['wer'])
+            for line in df.iterrows():
+                sent = line[1]['sent']
+                word_count_last_sent = 0
+                sent = sent.strip()
+                sent = sent.replace('}', '').replace('{', '').replace('|', '')
+                sent = sent.replace('<unk>', ' | ')
                 if eos:
-                    line = line.replace(eos, '')
-
-                for word in line.split():
+                    sent = sent.replace(eos, '')
+                sent_words = sent.split()
+                for word_index in range(num_unroll_steps):
+                    if word_index >= len(sent_words):
+                        # Padding Zero UpTo max_sent_size
+                        word = ' '
+                    else:
+                        word = sent_words[word_index]
                     words[fname].append(word)
                     if len(word) > max_word_length - 2:  # space for 'start' and 'end' chars
                         word = word[:max_word_length - 2]
@@ -88,13 +104,13 @@ def load_data(data_dir, max_word_length, eos='+'):
                     char_tokens[fname].append(char_array)
 
                     actual_max_word_length = max(actual_max_word_length, len(char_array))
+                    word_count_last_sent += 1
+                    if eos:
+                        word_tokens[fname].append(word_vocab.feed(eos))
 
-                if eos:
-                    word_tokens[fname].append(word_vocab.feed(eos))
-
-                    char_array = [char_vocab.feed(c) for c in '{' + eos + '}']
-                    char_tokens[fname].append(char_array)
-
+                        char_array = [char_vocab.feed(c) for c in '{' + eos + '}']
+                        char_tokens[fname].append(char_array)
+        wers[fname] = np.array(wers[fname])
     assert actual_max_word_length <= max_word_length
 
     print()
@@ -117,7 +133,7 @@ def load_data(data_dir, max_word_length, eos='+'):
         for i, char_array in enumerate(char_tokens[fname]):
             char_tensors[fname][i, :len(char_array)] = char_array
 
-    return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length, words
+    return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length, words, wers
 
 
 class FasttextModel:
@@ -149,6 +165,7 @@ class DataReaderFastText:
         self.batch_size = batch_size
         self.num_unroll_steps = num_unroll_steps
         self.word_vector_size = word_vector_size
+
     def iter(self):
         for x in self._x_batches:
             yield x.reshape(-1, self.word_vector_size).T
@@ -156,44 +173,47 @@ class DataReaderFastText:
 
 class DataReader:
 
-    def __init__(self, word_tensor, char_tensor, batch_size, num_unroll_steps):
+    def __init__(self, word_tensor, char_tensor, batch_size, num_unroll_steps, wers_ndarray, word_vocab, char_vocab):
 
-        length = word_tensor.shape[0]
+        length = word_tensor.shape[0]  # max_words_in_sent(20) * wers_ndarray.shape[0]
         assert char_tensor.shape[0] == length
 
         max_word_length = char_tensor.shape[1]
 
         # round down length to whole number of slices
         reduced_length = (length // (batch_size * num_unroll_steps)) * batch_size * num_unroll_steps
-        word_tensor = word_tensor[:reduced_length]
         char_tensor = char_tensor[:reduced_length, :]
 
-        ydata = np.zeros_like(word_tensor)
-        # shift left
-        ydata[:-1] = word_tensor[1:].copy()
-        ydata[-1] = word_tensor[0].copy()
+        # Padding zeroes to wers
+        for _ in range(batch_size - (len(wers_ndarray) % batch_size)):
+            wers_ndarray = np.append(wers_ndarray, 0)
+        print(str(wers_ndarray.shape))
 
         x_batches = char_tensor.reshape([batch_size, -1, num_unroll_steps, max_word_length])
-        y_batches = ydata.reshape([batch_size, -1, num_unroll_steps])
+        y_batches = wers_ndarray.reshape([batch_size, -1])
 
-        x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
-        y_batches = np.transpose(y_batches, axes=(1, 0, 2))
+        x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))  # num of batches*sent on batch*words in sent*char_length
+        y_batches = np.transpose(y_batches, axes=(1, 0))
+
+        if x_batches.shape[0] != y_batches.shape[0]:
+            y_batches = y_batches[:x_batches.shape[0], :]
 
         self._x_batches = list(x_batches)
         self._y_batches = list(y_batches)
         assert len(self._x_batches) == len(self._y_batches)
+        assert x_batches.shape[1] == y_batches.shape[1]
         self.length = len(self._y_batches)
         self.batch_size = batch_size
         self.num_unroll_steps = num_unroll_steps
 
     def iter(self):
         for x, y in zip(self._x_batches, self._y_batches):
-            yield x, y
+            yield x, np.array(y).reshape(y.shape[0], 1)
 
 
 if __name__ == '__main__':
 
-    _, _, wt, ct, _, _ = load_data('data', 65)
+    _, _, wt, ct, _, _ = load_data('data', 65, 25)
     print(wt.keys())
 
     count = 0

@@ -33,16 +33,16 @@ def define_flags():
     flags.DEFINE_float('learning_rate', 1.0, 'starting learning rate')
     flags.DEFINE_float('decay_when', 1.0, 'decay if validation perplexity does not improve by more than this much')
     flags.DEFINE_float('param_init', 0.05, 'initialize parameters at')
-    flags.DEFINE_integer('num_unroll_steps', 35, 'number of timesteps to unroll for')
-    flags.DEFINE_integer('batch_size', 20, 'number of sequences to train on in parallel')
-    flags.DEFINE_integer('max_epochs', 1, 'number of full passes through the training data')
+    flags.DEFINE_integer('num_unroll_steps', 20, 'number of timesteps to unroll for')
+    flags.DEFINE_integer('batch_size', 25, 'number of sequences to train on in parallel')
+    flags.DEFINE_integer('max_epochs', 20, 'number of full passes through the training data')
     flags.DEFINE_float('max_grad_norm', 5.0, 'normalize gradients at')
     flags.DEFINE_integer('max_word_length', 65, 'maximum word length')
 
     # bookkeeping
     flags.DEFINE_integer('seed', 3435, 'random number generator seed')
     flags.DEFINE_integer('print_every', 5, 'how often to print current loss')
-    flags.DEFINE_string('EOS', '+',
+    flags.DEFINE_string('EOS', None,
                         '<EOS> symbol. should be a single unused character (like +) for PTB and blank for others')
 
 
@@ -70,9 +70,7 @@ def initialize_epoch_data_dict():
     return {
         'epoch_number': list(),
         'train_loss': list(),
-        'train_perplexity': list(),
         'validation_loss': list(),
-        'valid_perplexity': list(),
         "epoch_training_time": list(),
         "model_name": list(),
         "learning_rate": list()
@@ -93,8 +91,8 @@ def main(print):
     if FLAGS.fasttext_model_path:
         fasttext_model_path = FLAGS.fasttext_model_path
 
-    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list = \
-        load_data(FLAGS.data_dir, FLAGS.max_word_length, eos=FLAGS.EOS)
+    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list, wers = \
+        load_data(FLAGS.data_dir, FLAGS.max_word_length, num_unroll_steps=FLAGS.num_unroll_steps, eos=FLAGS.EOS)
 
     fasttext_model = None
     if 'fasttext' in FLAGS.embedding:
@@ -112,17 +110,16 @@ def main(print):
 
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
-                              FLAGS.batch_size, FLAGS.num_unroll_steps)
+                              FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'], word_vocab, char_vocab)
 
 
 
     valid_reader = DataReader(word_tensors['valid'], char_tensors['valid'],
-
-                              FLAGS.batch_size, FLAGS.num_unroll_steps)
+                              FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'], word_vocab, char_vocab)
 
 
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
-                             FLAGS.batch_size, FLAGS.num_unroll_steps)
+                             FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'], word_vocab, char_vocab)
 
     print('initialized all dataset readers')
 
@@ -150,7 +147,7 @@ def main(print):
                 dropout=FLAGS.dropout,
                 embedding=FLAGS.embedding,
                 fasttext_word_dim=300)
-            train_model.update(model.loss_graph(train_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
+            train_model.update(model.loss_graph(train_model.logits, FLAGS.batch_size))
 
             # scaling loss by FLAGS.num_unroll_steps effectively scales gradients by the same factor.
             # we need it to reproduce how the original Torch code optimizes. Without this, our gradients will be
@@ -179,7 +176,7 @@ def main(print):
                 dropout=0.0,
                 embedding=FLAGS.embedding,
                 fasttext_word_dim=300)
-            valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
+            valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size))
 
         if FLAGS.load_model_for_training:
             saver.restore(session, FLAGS.load_model_for_training)
@@ -245,13 +242,13 @@ def main(print):
 
                 if count % FLAGS.print_every == 0:
                     string = str(
-                        '%6d: %d [%5d/%5d], train_loss/perplexity = %6.8f/%6.7f secs/batch = %.4fs, grad.norm=%6.8f' % (
+                        '%6d: %d [%5d/%5d], train_loss = %6.8f secs/batch = %.4fs' % (
                             step,
                             epoch, count,
                             train_reader.length,
-                            loss, np.exp(loss),
-                            time_elapsed,
-                            gradient_norm))
+                            loss,
+                            time_elapsed
+                            ))
                     print(string)
             string = str('Epoch training time:' + str(time.time() - epoch_start_time))
             print(string)
@@ -277,18 +274,16 @@ def main(print):
                 })
 
                 if count % FLAGS.print_every == 0:
-                    string = str("\t> validation loss = %6.8f, perplexity = %6.8f" % (loss, np.exp(loss)))
+                    string = str("\t> validation loss = %6.8f" % (loss))
                     print(string)
                 avg_valid_loss += loss / valid_reader.length
 
             print("at the end of epoch:" + str(epoch))
             epochs_results['epoch_number'].append(str(epoch))
-            print("train loss = %6.8f, perplexity = %6.8f" % (avg_train_loss, np.exp(avg_train_loss)))
+            print("train loss = %6.8f" % (avg_train_loss))
             epochs_results['train_loss'].append(avg_train_loss)
-            epochs_results['train_perplexity'].append(np.exp(avg_train_loss))
-            print("validation loss = %6.8f, perplexity = %6.8f" % (avg_valid_loss, np.exp(avg_valid_loss)))
+            print("validation loss = %6.8f" % (avg_valid_loss))
             epochs_results['validation_loss'].append(avg_valid_loss)
-            epochs_results['valid_perplexity'].append(np.exp(avg_valid_loss))
 
             save_as = '%s/epoch%03d_%.4f.model' % (FLAGS.train_dir, epoch, avg_valid_loss)
             saver.save(session, save_as)
@@ -300,9 +295,7 @@ def main(print):
             ''' write out summary events '''
             summary = tf.Summary(value=[
                 tf.Summary.Value(tag="train_loss", simple_value=avg_train_loss),
-                tf.Summary.Value(tag="train_perplexity", simple_value=np.exp(avg_train_loss)),
                 tf.Summary.Value(tag="valid_loss", simple_value=avg_valid_loss),
-                tf.Summary.Value(tag="valid_perplexity", simple_value=np.exp(avg_valid_loss)),
             ])
             summary_writer.add_summary(summary, step)
 
@@ -313,7 +306,7 @@ def main(print):
                 string = str('learning rate was:' + str(current_learning_rate))
                 print(string)
                 current_learning_rate *= FLAGS.learning_rate_decay
-                if current_learning_rate < 1.e-5:
+                if current_learning_rate < 1.e-6:
                     print('learning rate too small - stopping now')
                     break
 
