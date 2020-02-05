@@ -1,6 +1,8 @@
 from __future__ import print_function
 from __future__ import division
 
+from sklearn.preprocessing import MinMaxScaler
+import ast
 import os
 import codecs
 import collections
@@ -68,9 +70,11 @@ def load_data(data_dir, max_word_length, num_unroll_steps, eos='+'):
     char_tokens = collections.defaultdict(list)
     wers = {}
     words = {}
+    acoustics = {}
     for fname in ('train', 'valid', 'test'):
         wers[fname] = pd.Series(name='wer')
         words[fname] = list()
+        acoustics[fname] = list()
         print('reading', fname)
         # with codecs.open(os.path.join(data_dir, fname + '.txt'), 'r', 'utf-8') as f:
         print(data_dir)
@@ -80,6 +84,7 @@ def load_data(data_dir, max_word_length, num_unroll_steps, eos='+'):
             print(str(df.shape))
             wers[fname] = wers[fname].append(df['wer'])
             for line in df.iterrows():
+                sent_acoustics = list(ast.literal_eval(line[1]['acustic_tuple']))
                 sent = line[1]['sent']
                 word_count_last_sent = 0
                 sent = sent.strip()
@@ -92,9 +97,17 @@ def load_data(data_dir, max_word_length, num_unroll_steps, eos='+'):
                     if word_index >= len(sent_words):
                         # Padding Zero UpTo max_sent_size
                         word = ' '
+                        acoustics[fname].append([0, 0, 0, 0])
                     else:
                         word = sent_words[word_index]
+                        acoustic_tuple = sent_acoustics[word_index]
+                        feature_1, feature_2 = acoustic_tuple
+                        feature_3 = feature_1 + feature_2
+                        feature_4 = feature_1 - feature_2
+                        acoustics[fname].append([feature_1, feature_2, feature_3, feature_4])
+
                     words[fname].append(word)
+
                     if len(word) > max_word_length - 2:  # space for 'start' and 'end' chars
                         word = word[:max_word_length - 2]
 
@@ -112,7 +125,7 @@ def load_data(data_dir, max_word_length, num_unroll_steps, eos='+'):
                         char_tokens[fname].append(char_array)
         wers[fname] = np.array(wers[fname])
     assert actual_max_word_length <= max_word_length
-
+    assert len(words) == len(acoustics)
     print()
     print('actual longest token length is:', actual_max_word_length)
     print('size of word vocabulary:', word_vocab.size)
@@ -127,13 +140,13 @@ def load_data(data_dir, max_word_length, num_unroll_steps, eos='+'):
     for fname in ('train', 'valid', 'test'):
         assert len(char_tokens[fname]) == len(word_tokens[fname])
 
-        word_tensors[fname] = np.array(word_tokens[fname], dtype=np.int32)
+        word_tensors[fname] = np.array(word_tokens[fname] , dtype=np.int32)
         char_tensors[fname] = np.zeros([len(char_tokens[fname]), actual_max_word_length], dtype=np.int32)
 
         for i, char_array in enumerate(char_tokens[fname]):
             char_tensors[fname][i, :len(char_array)] = char_array
 
-    return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length, words, wers
+    return word_vocab, char_vocab, word_tensors, char_tensors, actual_max_word_length, words, wers, acoustics
 
 
 class FasttextModel:
@@ -145,32 +158,37 @@ class FasttextModel:
 
 
 class DataReaderFastText:
+    FEATURES_PER_WORD = 4
+    def __init__(self, words_list, batch_size, num_unroll_steps, model, data, acoustics):
 
-    def __init__(self, words_list, batch_size, num_unroll_steps, model, data):
         length = len(words_list[data])
         word_vector_size = model.vector_size
 
         # round down length to whole number of slices
         reduced_length = (length // (batch_size * num_unroll_steps)) * batch_size * num_unroll_steps
         words_list[data] = words_list[data][:reduced_length]
+        acoustics[data] = acoustics[data][:reduced_length]
 
         words_vectors_tensor = model.wv[words_list[data]]
+        acoustics_tensor = np.array([np.array(xi) for xi in acoustics[data]])
 
-        x_batches = words_vectors_tensor.reshape([batch_size, -1, num_unroll_steps, word_vector_size])
+        x_ft_batches = words_vectors_tensor.reshape([batch_size, -1, num_unroll_steps, word_vector_size])
+        x_ft_batches = np.transpose(x_ft_batches, axes=(1, 0, 2, 3))
 
-        x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
+        x_acoustics_batches = acoustics_tensor.reshape([batch_size, -1, num_unroll_steps, self.FEATURES_PER_WORD])
+        x_acoustics_batches = np.transpose(x_acoustics_batches, axes=(1, 0, 2, 3))
 
-        self._x_batches = list(x_batches)
-        self.length = len(self._x_batches)
+        assert x_acoustics_batches.shape[0] == x_ft_batches.shape[0]
+        self.x_acoustics_batches = x_acoustics_batches
+        self.x_ft_batches = list(x_ft_batches)
+        self.length = len(self.x_ft_batches)
         self.batch_size = batch_size
         self.num_unroll_steps = num_unroll_steps
         self.word_vector_size = word_vector_size
 
     def iter(self):
-        for x in self._x_batches:
-            yield x.reshape(-1, self.word_vector_size).T
-
-
+        for x_ft, x_acoustics in zip(self.x_ft_batches, self.x_acoustics_batches):
+            yield np.concatenate((x_ft.reshape(-1, self.word_vector_size), x_acoustics.reshape(-1, self.FEATURES_PER_WORD)), axis=1).T
 class DataReader:
 
     def __init__(self, word_tensor, char_tensor, batch_size, num_unroll_steps, wers_ndarray, word_vocab, char_vocab):

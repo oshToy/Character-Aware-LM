@@ -91,7 +91,7 @@ def main(print):
     if FLAGS.fasttext_model_path:
         fasttext_model_path = FLAGS.fasttext_model_path
 
-    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list, wers = \
+    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list, wers, acoustics = \
         load_data(FLAGS.data_dir, FLAGS.max_word_length, num_unroll_steps=FLAGS.num_unroll_steps, eos=FLAGS.EOS)
 
     fasttext_model = None
@@ -101,13 +101,12 @@ def main(print):
         train_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
                                              num_unroll_steps=FLAGS.num_unroll_steps,
                                              model=fasttext_model,
-                                             data='train')
+                                             data='train', acoustics=acoustics)
 
         valid_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
                                              num_unroll_steps=FLAGS.num_unroll_steps,
                                              model=fasttext_model,
-                                             data='valid')
-
+                                             data='valid', acoustics=acoustics)
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
                               FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'], word_vocab, char_vocab)
