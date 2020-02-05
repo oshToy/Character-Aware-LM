@@ -6,28 +6,15 @@
 [
  {
   "data_set": "AMI",
-  "training": true,
-  "testing": false,
+  "training": false,
+  "testing": true,
   "checkpoint_number_for_test_or_null_for_last_checkpoint": null,
-  "checkpoint_file_for_test": null,
+  "checkpoint_file_for_test": "./trained_models/AMI_2019-09-13--13-16-00/epoch015_3.5988.model",
   "embedding":"kim fasttext",
   "fasttext_model_path": "E:\\RNNLM Project\\Models\\Wikipedia\\Lower Case\\15 Epoch\\Wikipedia_epoch15.model",
-  "max_epochs": 1,
+  "max_epochs": 30,
   "rnn_size": 650,
-  "rnn_layers": 1,
-  "highway_layers": 2
- },
- {
-  "data_set": "AMI",
-  "training": true,
-  "testing": false,
-  "checkpoint_number_for_test_or_null_for_last_checkpoint": null,
-  "checkpoint_file_for_test": null,
-  "embedding":"kim fasttext",
-  "fasttext_model_path": "E:\\RNNLM Project\\Models\\Wikipedia\\Lower Case\\15 Epoch\\Wikipedia_epoch15.model",
-  "max_epochs": 2,
-  "rnn_size": 650,
-  "rnn_layers": 1,
+  "rnn_layers": 2,
   "highway_layers": 2
  }
 ]

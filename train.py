@@ -41,7 +41,7 @@ def define_flags(data_dir, train_dir, fasttext_model_path, embedding, max_epochs
     flags.DEFINE_float('decay_when', 1.0, 'decay if validation perplexity does not improve by more than this much')
     flags.DEFINE_float('param_init', 0.05, 'initialize parameters at')
     flags.DEFINE_integer('num_unroll_steps', 35, 'number of timesteps to unroll for')
-    flags.DEFINE_integer('batch_size', 25, 'number of sequences to train on in parallel')
+    flags.DEFINE_integer('batch_size', 20, 'number of sequences to train on in parallel')
     flags.DEFINE_integer('max_epochs', max_epochs, 'number of full passes through the training data')
     flags.DEFINE_float('max_grad_norm', 5.0, 'normalize gradients at')
     flags.DEFINE_integer('max_word_length', 65, 'maximum word length')
@@ -209,8 +209,16 @@ def main(print):
             epoch_start_time = time.time()
             avg_train_loss = 0.0
             count = 0
-            for batch_kim, batch_ft in zip(train_reader.iter(), train_ft_reader.iter()):
-                x, y = batch_kim
+            if fasttext_model:
+                iter_over = zip(train_reader.iter(), train_ft_reader.iter())
+
+            else:
+                iter_over = train_reader.iter()
+            for batch_kim, batch_ft in iter_over:
+                if fasttext_model:
+                    x, y = batch_kim
+                else:
+                    x, y = batch_kim, batch_ft
                 count += 1
                 start_time = time.time()
                 if fasttext_model:
@@ -318,7 +326,6 @@ def main(print):
                 if current_learning_rate < 1.e-3:
                     print('learning rate too small - stopping now')
                     break
-
                 session.run(train_model.learning_rate.assign(current_learning_rate))
                 string = str('new learning rate is:' + str(current_learning_rate))
                 print(string)

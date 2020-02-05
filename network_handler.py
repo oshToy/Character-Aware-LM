@@ -59,7 +59,7 @@ def main():
         if model['training']:
             train(logger)
         if model['testing']:
-            checkpoint_file = checkpoint_file_from_number(model, trained_model_folder, logger)
+            checkpoint_file = checkpoint_file_from_number(model, trained_model_folder)
             logger("test on model file : " + str(checkpoint_file))
             if not checkpoint_file:
                 break
@@ -69,7 +69,7 @@ def main():
             test(logger)
 
 
-def checkpoint_file_from_number(model,trained_model_folder):
+def checkpoint_file_from_number(model, trained_model_folder):
     if model["checkpoint_file_for_test"]:
         return model["checkpoint_file_for_test"]
 

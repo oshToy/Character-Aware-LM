@@ -184,6 +184,7 @@ def inference_graph(char_vocab_size, word_vocab_size,
     # [batch_size x num_unroll_steps, cnn_size]  # where cnn_size=sum(kernel_features)
     input_cnn = tdnn(input_embedded, kernels, kernel_features)
 
+    input2_ = None
     if 'fasttext' in embedding:
         input2_ = tf.placeholder(tf.float32, shape=[fasttext_word_dim,batch_size, num_unroll_steps], name="input2")
         input2_ = tf.reshape(input2_, [fasttext_word_dim, -1])
@@ -223,19 +224,29 @@ def inference_graph(char_vocab_size, word_vocab_size,
                 if idx > 0:
                     scope.reuse_variables()
                 logits.append(linear(output, word_vocab_size))
-
-    return adict(
-        input=input_,
-        input2=input2_,
-        clear_char_embedding_padding=clear_char_embedding_padding,
-        input_embedded=input_embedded,
-        input_cnn=input_cnn,
-        initial_rnn_state=initial_rnn_state,
-        final_rnn_state=final_rnn_state,
-        rnn_outputs=outputs,
-        logits=logits
-    )
-
+    if input2_ is not None:
+        return adict(
+            input=input_,
+            input2=input2_,
+            clear_char_embedding_padding=clear_char_embedding_padding,
+            input_embedded=input_embedded,
+            input_cnn=input_cnn,
+            initial_rnn_state=initial_rnn_state,
+            final_rnn_state=final_rnn_state,
+            rnn_outputs=outputs,
+            logits=logits
+        )
+    else:
+        return adict(
+            input=input_,
+            clear_char_embedding_padding=clear_char_embedding_padding,
+            input_embedded=input_embedded,
+            input_cnn=input_cnn,
+            initial_rnn_state=initial_rnn_state,
+            final_rnn_state=final_rnn_state,
+            rnn_outputs=outputs,
+            logits=logits
+        )
 
 def loss_graph(logits, batch_size, num_unroll_steps):
     with tf.variable_scope('Loss'):
