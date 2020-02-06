@@ -31,7 +31,7 @@ def define_flags():
     # optimization
     flags.DEFINE_float('learning_rate_decay', 0.5, 'learning rate decay')
     flags.DEFINE_float('learning_rate', 1.0, 'starting learning rate')
-    flags.DEFINE_float('decay_when', 1.0, 'decay if validation perplexity does not improve by more than this much')
+    flags.DEFINE_float('decay_when', 0.00001, 'decay if validation mse does not improve by more than this much')
     flags.DEFINE_float('param_init', 0.05, 'initialize parameters at')
     flags.DEFINE_integer('num_unroll_steps', 20, 'number of timesteps to unroll for')
     flags.DEFINE_integer('batch_size', 25, 'number of sequences to train on in parallel')
@@ -145,7 +145,8 @@ def main(print):
                 num_unroll_steps=FLAGS.num_unroll_steps,
                 dropout=FLAGS.dropout,
                 embedding=FLAGS.embedding,
-                fasttext_word_dim=300)
+                fasttext_word_dim=300,
+                acoustic_features_dim=4)
             train_model.update(model.loss_graph(train_model.logits, FLAGS.batch_size))
 
             # scaling loss by FLAGS.num_unroll_steps effectively scales gradients by the same factor.
@@ -174,7 +175,8 @@ def main(print):
                 num_unroll_steps=FLAGS.num_unroll_steps,
                 dropout=0.0,
                 embedding=FLAGS.embedding,
-                fasttext_word_dim=300)
+                fasttext_word_dim=300,
+                acoustic_features_dim=4)
             valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size))
 
         if FLAGS.load_model_for_training:
@@ -290,16 +292,10 @@ def main(print):
             epochs_results['model_name'].append(str(save_as))
             epochs_results['learning_rate'].append(str(session.run(train_model.learning_rate)))
 
-
-            ''' write out summary events '''
-            summary = tf.Summary(value=[
-                tf.Summary.Value(tag="train_loss", simple_value=avg_train_loss),
-                tf.Summary.Value(tag="valid_loss", simple_value=avg_valid_loss),
-            ])
-            summary_writer.add_summary(summary, step)
+            current_learning_rate = session.run(train_model.learning_rate)
 
             ''' decide if need to decay learning rate '''
-            if best_valid_loss is not None and np.exp(avg_valid_loss) > np.exp(best_valid_loss) - FLAGS.decay_when:
+            if best_valid_loss is not None and avg_valid_loss >best_valid_loss - FLAGS.decay_when:
                 print('validation perplexity did not improve enough, decay learning rate')
                 current_learning_rate = session.run(train_model.learning_rate)
                 string = str('learning rate was:' + str(current_learning_rate))
@@ -314,6 +310,14 @@ def main(print):
                 print(string)
             else:
                 best_valid_loss = avg_valid_loss
+
+            ''' write out summary events '''
+            summary = tf.Summary(value=[
+                tf.Summary.Value(tag="train_loss", simple_value=avg_train_loss),
+                tf.Summary.Value(tag="valid_loss", simple_value=avg_valid_loss),
+                tf.Summary.Value(tag="learning_rate", simple_value=current_learning_rate)
+            ])
+            summary_writer.add_summary(summary, step)
 
     # Save model performance data
     pd.DataFrame(epochs_results).to_csv(FLAGS.train_dir + '/train_results.csv')

@@ -177,6 +177,16 @@ class DataReaderFastText:
 
         x_acoustics_batches = acoustics_tensor.reshape([batch_size, -1, num_unroll_steps, self.FEATURES_PER_WORD])
         x_acoustics_batches = np.transpose(x_acoustics_batches, axes=(1, 0, 2, 3))
+        original_x_acoustics_batches_shape = x_acoustics_batches.shape
+
+        def min_max_scale_batch(batch):
+            scaler = MinMaxScaler()
+            batch = batch.reshape(-1, self.FEATURES_PER_WORD)
+            return scaler.fit_transform(batch)
+
+        x_acoustics_batches = x_acoustics_batches.reshape(x_acoustics_batches.shape[0], -1)
+        x_acoustics_batches = np.apply_along_axis(func1d=min_max_scale_batch, axis=1, arr=x_acoustics_batches)
+        x_acoustics_batches = x_acoustics_batches.reshape(original_x_acoustics_batches_shape)
 
         assert x_acoustics_batches.shape[0] == x_ft_batches.shape[0]
         self.x_acoustics_batches = x_acoustics_batches
@@ -189,6 +199,9 @@ class DataReaderFastText:
     def iter(self):
         for x_ft, x_acoustics in zip(self.x_ft_batches, self.x_acoustics_batches):
             yield np.concatenate((x_ft.reshape(-1, self.word_vector_size), x_acoustics.reshape(-1, self.FEATURES_PER_WORD)), axis=1).T
+            #TODO min max acoustic
+
+
 class DataReader:
 
     def __init__(self, word_tensor, char_tensor, batch_size, num_unroll_steps, wers_ndarray, word_vocab, char_vocab):

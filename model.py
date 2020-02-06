@@ -159,7 +159,8 @@ def inference_graph(char_vocab_size, word_vocab_size,
                     num_unroll_steps=35,
                     dropout=0.0,
                     embedding=['kim'],
-                    fasttext_word_dim=300):
+                    fasttext_word_dim=300,
+                    acoustic_features_dim=4):
     assert len(kernels) == len(kernel_features), 'Kernel and Features must have the same size'
 
     input_ = tf.placeholder(tf.int32, shape=[batch_size, num_unroll_steps, max_word_length], name="input")
@@ -185,10 +186,10 @@ def inference_graph(char_vocab_size, word_vocab_size,
     input_cnn = tdnn(input_embedded, kernels, kernel_features)
 
     if 'fasttext' in embedding:
-        input2_ = tf.placeholder(tf.float32, shape=[fasttext_word_dim,batch_size, num_unroll_steps], name="input2")
-        input2_ = tf.reshape(input2_, [fasttext_word_dim, -1])
+        input2_ = tf.placeholder(tf.float32, shape=[fasttext_word_dim + acoustic_features_dim ,batch_size, num_unroll_steps], name="input2")
+        input2_ = tf.reshape(input2_, [fasttext_word_dim + acoustic_features_dim, -1])
         input_mofified_ft = linearFT(input2_, tf.Dimension(1100), scope='fastTextFC')
-        input_cnn = merge_embedding(input_cnn,input_mofified_ft, r'addition')
+        input_cnn = merge_embedding(input_cnn, input_mofified_ft, r'addition')
 
     ''' Maybe apply Highway '''
     if num_highway_layers > 0:
@@ -265,7 +266,7 @@ def training_graph(loss, learning_rate=1.0, max_grad_norm=5.0):
         tvars = tf.trainable_variables()
         grads, global_norm = tf.clip_by_global_norm(tf.gradients(loss, tvars), max_grad_norm)
 
-        optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+        optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
         train_op = optimizer.apply_gradients(zip(grads, tvars), global_step=global_step)
 
     return adict(
