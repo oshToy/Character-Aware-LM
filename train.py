@@ -17,8 +17,8 @@ FLAGS = flags.FLAGS
 
 def define_flags():
     # data
-    flags.DEFINE_string('load_model_for_training', None,
-                        '(optional) filename of the model to load. Useful for re-starting training from a checkpoint')
+    flags.DEFINE_string('load_model_for_training', r"E:\Trained Models\AMI_2019-09-13--13-16-00\epoch000_4.1121.model",
+                        '(optional) filename of the model to load. Useful for re-starting training from a checkpoint. example: epoch000_0.0614.model')
     # model params
     flags.DEFINE_integer('rnn_size', 650, 'size of LSTM internal state')
     flags.DEFINE_integer('highway_layers', 2, 'number of highway layers')
