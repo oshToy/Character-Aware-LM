@@ -129,6 +129,7 @@ class FasttextModel:
 
 
 class DataReaderFastText:
+    ACOUSTIC_FEATURES_PER_WORD = 4
 
     def __init__(self, words_list, batch_size, num_unroll_steps, model, data):
         length = len(words_list[data])
@@ -140,22 +141,27 @@ class DataReaderFastText:
 
         words_vectors_tensor = model.wv[words_list[data]]
 
-        x_batches = words_vectors_tensor.reshape([batch_size, -1, num_unroll_steps, word_vector_size])
+        x_ft_batches = words_vectors_tensor.reshape([batch_size, -1, num_unroll_steps, word_vector_size])
+        x_ft_batches = np.transpose(x_ft_batches, axes=(1, 0, 2, 3))
 
-        x_batches = np.transpose(x_batches, axes=(1, 0, 2, 3))
+        x_acoustics_batches = np.zeros((batch_size, x_ft_batches.shape[0], num_unroll_steps, self.ACOUSTIC_FEATURES_PER_WORD))
+        x_acoustics_batches = np.transpose(x_acoustics_batches, axes=(1, 0, 2, 3))
 
-        self._x_batches = list(x_batches)
-        self.length = len(self._x_batches)
+        assert x_acoustics_batches.shape[0] == x_ft_batches.shape[0]
+        self.x_acoustics_batches = x_acoustics_batches
+        self.x_ft_batches = list(x_ft_batches)
+        self.length = len(self.x_ft_batches)
         self.batch_size = batch_size
         self.num_unroll_steps = num_unroll_steps
         self.word_vector_size = word_vector_size
+
     def iter(self):
-        for x in self._x_batches:
-            yield x.reshape(-1, self.word_vector_size).T
+        for x_ft, x_acoustics in zip(self.x_ft_batches, self.x_acoustics_batches):
+            yield np.concatenate(
+                (x_ft.reshape(-1, self.word_vector_size), x_acoustics.reshape(-1, self.ACOUSTIC_FEATURES_PER_WORD)), axis=1).T
 
 
 class DataReader:
-
     def __init__(self, word_tensor, char_tensor, batch_size, num_unroll_steps):
 
         length = word_tensor.shape[0]
@@ -189,6 +195,7 @@ class DataReader:
     def iter(self):
         for x, y in zip(self._x_batches, self._y_batches):
             yield x, y
+
 
 
 if __name__ == '__main__':

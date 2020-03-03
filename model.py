@@ -159,7 +159,8 @@ def inference_graph(char_vocab_size, word_vocab_size,
                     num_unroll_steps=35,
                     dropout=0.0,
                     embedding=['kim'],
-                    fasttext_word_dim=300):
+                    fasttext_word_dim=300,
+                    acoustic_features_dim=4):
     assert len(kernels) == len(kernel_features), 'Kernel and Features must have the same size'
 
     input_ = tf.placeholder(tf.int32, shape=[batch_size, num_unroll_steps, max_word_length], name="input")
@@ -186,8 +187,10 @@ def inference_graph(char_vocab_size, word_vocab_size,
 
     input2_ = None
     if 'fasttext' in embedding:
-        input2_ = tf.placeholder(tf.float32, shape=[fasttext_word_dim,batch_size, num_unroll_steps], name="input2")
-        input2_ = tf.reshape(input2_, [fasttext_word_dim, -1])
+        input2_ = tf.placeholder(tf.float32,
+                                 shape=[fasttext_word_dim + acoustic_features_dim, batch_size, num_unroll_steps],
+                                 name="input2")
+        input2_ = tf.reshape(input2_, [fasttext_word_dim + acoustic_features_dim, -1])
         input_mofified_ft = linearFT(input2_, tf.Dimension(1100), scope='fastTextFC')
         input_mofified_ft = tf.nn.relu(input_mofified_ft) #Added RELU to matrix after FT
         input_cnn = merge_embedding(input_cnn,input_mofified_ft, r'addition')
