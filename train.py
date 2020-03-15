@@ -17,7 +17,7 @@ FLAGS = flags.FLAGS
 
 def define_flags():
     # data
-    flags.DEFINE_string('load_model_for_training', r"E:\Trained Models\AMI_2019-09-13--13-16-00\epoch000_4.1121.model",
+    flags.DEFINE_string('load_model_for_training', r"E:\Trained Models\AMI_2020-03-03--13-34-11\epoch001_4.7228.model",
                         '(optional) filename of the model to load. Useful for re-starting training from a checkpoint. example: epoch000_0.0614.model')
     # model params
     flags.DEFINE_integer('rnn_size', 650, 'size of LSTM internal state')
@@ -156,8 +156,8 @@ def main(print):
             train_model.update(model.training_graph(train_model.loss * FLAGS.num_unroll_steps,
                                                     FLAGS.learning_rate, FLAGS.max_grad_norm))
 
-        # create saver before creating more graph nodes, so that we do not save any vars defined below
-        saver = tf.train.Saver(max_to_keep=50)
+
+
 
         ''' build graph for validation and testing (shares parameters with the training graph!) '''
         with tf.variable_scope("Model", reuse=True):
@@ -179,10 +179,22 @@ def main(print):
                 acoustic_features_dim=4)
             valid_model.update(model.loss_graph(valid_model.logits, FLAGS.batch_size))
 
+        # create saver before creating more graph nodes, so that we do not save any vars defined below
+        if FLAGS.load_model_for_training:
+            # delete last layers (softmax) - SimpleLinear/Matrix + Bias
+            variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+            subset_grpah_for_loading = variables[:29] + variables[31:]
+            saver = tf.train.Saver(max_to_keep=50, var_list=subset_grpah_for_loading)
+        else:
+            saver = tf.train.Saver(max_to_keep=50)
+
         if FLAGS.load_model_for_training:
             saver.restore(session, FLAGS.load_model_for_training)
             string = str('Loaded model from' + str(FLAGS.load_model_for_training) + 'saved at global step' + str(
                 train_model.global_step.eval()))
+            print(string)
+            session.run(tf.variables_initializer(var_list=variables[29:31]))
+            string = str('initialized specific scope for fresh model. Size:' + str(model.model_size()))
             print(string)
         else:
             tf.global_variables_initializer().run()

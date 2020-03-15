@@ -38,6 +38,7 @@ def conv2d(input_, output_dim, k_h, k_w, name="conv2d"):
 #
 #     return tf.matmul(tf.transpose(matrix)) + bias_term
 
+
 def linearFT(_input,output_size, scope=None):
     shape = _input.get_shape().as_list()
     if len(shape) != 2:
@@ -50,6 +51,7 @@ def linearFT(_input,output_size, scope=None):
         matrix = tf.get_variable("Matrix", [output_size, input_size], dtype=tf.float32)
         bias_term = tf.get_variable("Bias", [output_size], dtype=tf.float32)
     return tf.matmul(tf.transpose(_input), tf.transpose(matrix)) + bias_term
+
 
 def linear(input_, output_size, scope=None):
     '''
@@ -85,6 +87,8 @@ def connection(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Embed
     '''
     with tf.variable_scope(scope):
      return
+
+
 def highway(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Highway'):
     """Highway Network (cf. http://arxiv.org/abs/1505.00387).
 
@@ -167,7 +171,7 @@ def inference_graph(char_vocab_size, word_vocab_size,
 
     ''' First, embed characters '''
     with tf.variable_scope('Embedding'):
-        char_embedding = tf.get_variable('char_embedding', [char_vocab_size, char_embed_size])
+        char_embedding = tf.get_variable('char_embedding', [36, char_embed_size])
 
         ''' this op clears embedding vector of first symbol (symbol at position 0, which is by convention the position
         of the padding symbol). It can be used to mimic Torch7 embedding operator that keeps padding mapped to
