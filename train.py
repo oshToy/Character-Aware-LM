@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
 import os
 import time
 import numpy as np
@@ -15,7 +14,7 @@ flags = tf.flags
 FLAGS = flags.FLAGS
 
 
-def define_flags(data_dir, train_dir, fasttext_model_path, embedding, max_epochs=25, rnn_size=650, rnn_layers=1, highway_layers=2):
+def define_flags(data_dir, train_dir, fasttext_model_path, embedding, max_epochs=25, rnn_size=650, rnn_layers=2, highway_layers=2):
     flags.DEFINE_string('data_dir', data_dir,
                         'data directory. Should contain train.txt/valid.txt/test.txt with input data')
     flags.DEFINE_string('train_dir', train_dir,
