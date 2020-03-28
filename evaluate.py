@@ -55,6 +55,8 @@ def save_data_to_csv(avg_loss,count,time_elapsed):
     test_results["time_per_batch"].append(time_elapsed / count)
 
     pd.DataFrame(test_results, index=range(1)).to_csv(FLAGS.train_dir + '/test_results.csv')
+
+
 def main(print):
     ''' Loads trained model and evaluates it on test split '''
     if FLAGS.load_model_for_test is None:
@@ -65,11 +67,11 @@ def main(print):
         print('Checkpoint file not found', FLAGS.load_model_for_test)
         return -1
 
-    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list = \
-        load_data(FLAGS.data_dir, FLAGS.max_word_length, eos=FLAGS.EOS)
+    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list, wers, acoustics = \
+        load_data(FLAGS.data_dir, FLAGS.max_word_length, num_unroll_steps=FLAGS.num_unroll_steps, eos=FLAGS.EOS, datas=['test'])
 
     test_reader = DataReader(word_tensors['test'], char_tensors['test'],
-                              FLAGS.batch_size, FLAGS.num_unroll_steps)
+                              FLAGS.batch_size, FLAGS.num_unroll_steps, wers['test'], word_vocab, char_vocab)
 
     fasttext_model_path = None
     if FLAGS.fasttext_model_path:
@@ -80,7 +82,7 @@ def main(print):
         test_ft_reader = DataReaderFastText(words_list=words_list, batch_size=FLAGS.batch_size,
                                             num_unroll_steps=FLAGS.num_unroll_steps,
                                             model=fasttext_model,
-                                            data='test')
+                                            data='test', acoustics=acoustics)
 
     print('initialized test dataset reader')
 
@@ -106,11 +108,13 @@ def main(print):
                     num_unroll_steps=FLAGS.num_unroll_steps,
                     dropout=0,
                     embedding=FLAGS.embedding,
-                    fasttext_word_dim=300)
-            m.update(model.loss_graph(m.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
+                    fasttext_word_dim=300,
+                    acoustic_features_dim=4)
+            m.update(model.loss_graph(m.logits, FLAGS.batch_size))
 
             global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
 
+        variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
         saver = tf.train.Saver()
         saver.restore(session, FLAGS.load_model_for_test)
         print('Loaded model from' + str(FLAGS.load_model_for_test) + 'saved at global step' +str(global_step.eval()))
@@ -119,29 +123,31 @@ def main(print):
         rnn_state = session.run(m.initial_rnn_state)
         count = 0
         avg_loss = 0
+        labels = []
+        predictions = []
         start_time = time.time()
         for batch_kim, batch_ft in zip(test_reader.iter(), test_ft_reader.iter()):
             count += 1
             x, y = batch_kim
-            loss, rnn_state = session.run([
+            loss, logits = session.run([
                 m.loss,
-                m.final_rnn_state
+                m.logits
             ], {
                 m.input2: batch_ft,
-                m.input  : x,
+                m.input: x,
                 m.targets: y,
                 m.initial_rnn_state: rnn_state
             })
 
-            avg_loss += loss
-
+            labels.append(y)
+            predictions.append(logits)
         avg_loss /= count
         time_elapsed = time.time() - start_time
 
         print("test loss = %6.8f, perplexity = %6.8f" % (avg_loss, np.exp(avg_loss)))
         print("test samples:" + str( count*FLAGS.batch_size) + "time elapsed:" + str( time_elapsed) + "time per one batch:" +str(time_elapsed/count))
 
-        save_data_to_csv(avg_loss, count, time_elapsed)
+        pd.DataFrame({"lables": labels, "predictions": predictions}).to_csv(FLAGS.train_dir + '/test_results.csv')
 
 
 

@@ -17,7 +17,7 @@ FLAGS = flags.FLAGS
 
 def define_flags():
     # data
-    flags.DEFINE_string('load_model_for_training', r"E:\Trained Models\AMI_2020-03-03--13-34-11\epoch001_4.7228.model",
+    flags.DEFINE_string('load_model_for_training', r"C:\Users\Ohad.Volk\Desktop\Oshri\tf-lstm-char-cnn-master\tf-lstm-char-cnn-master\trained_models\AMI_2020-03-18--14-03-41\epoch000_4.0648.model",
                         '(optional) filename of the model to load. Useful for re-starting training from a checkpoint. example: epoch000_0.0614.model')
     # model params
     flags.DEFINE_integer('rnn_size', 650, 'size of LSTM internal state')
@@ -117,8 +117,8 @@ def main(print):
                               FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'], word_vocab, char_vocab)
 
 
-    test_reader = DataReader(word_tensors['test'], char_tensors['test'],
-                             FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'], word_vocab, char_vocab)
+    # test_reader = DataReader(word_tensors['test'], char_tensors['test'],
+    #                          FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'], word_vocab, char_vocab)
 
     print('initialized all dataset readers')
 
@@ -157,8 +157,6 @@ def main(print):
                                                     FLAGS.learning_rate, FLAGS.max_grad_norm))
 
 
-
-
         ''' build graph for validation and testing (shares parameters with the training graph!) '''
         with tf.variable_scope("Model", reuse=True):
             valid_model = model.inference_graph(
@@ -184,12 +182,11 @@ def main(print):
             # delete last layers (softmax) - SimpleLinear/Matrix + Bias
             variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
             subset_grpah_for_loading = variables[:29] + variables[31:]
-            saver = tf.train.Saver(max_to_keep=50, var_list=subset_grpah_for_loading)
-        else:
+            loader = tf.train.Saver(max_to_keep=50, var_list=subset_grpah_for_loading)
             saver = tf.train.Saver(max_to_keep=50)
 
         if FLAGS.load_model_for_training:
-            saver.restore(session, FLAGS.load_model_for_training)
+            loader.restore(session, FLAGS.load_model_for_training)
             string = str('Loaded model from' + str(FLAGS.load_model_for_training) + 'saved at global step' + str(
                 train_model.global_step.eval()))
             print(string)
@@ -222,13 +219,14 @@ def main(print):
                 start_time = time.time()
                 if fasttext_model:
                     ft_vectors = fasttext_model.wv[words_list['train'][count]].reshape(fasttext_model.wv.vector_size, 1)
-                    loss, _, rnn_state, gradient_norm, step, _ = session.run([
+                    loss, _, rnn_state, gradient_norm, step, _, logits = session.run([
                         train_model.loss,
                         train_model.train_op,
                         train_model.final_rnn_state,
                         train_model.global_norm,
                         train_model.global_step,
-                        train_model.clear_char_embedding_padding
+                        train_model.clear_char_embedding_padding,
+                        train_model.logits
                     ], {
                         train_model.input2: batch_ft,
                         train_model.input: x,
@@ -236,19 +234,21 @@ def main(print):
                         train_model.initial_rnn_state: rnn_state
                     })
                 else:
-                    loss, _, rnn_state, gradient_norm, step, _ = session.run([
+                    loss, _, rnn_state, gradient_norm, step, _ , logits = session.run([
                         train_model.loss,
                         train_model.train_op,
                         train_model.final_rnn_state,
                         train_model.global_norm,
                         train_model.global_step,
-                        train_model.clear_char_embedding_padding
+                        train_model.clear_char_embedding_padding,
+                        train_model.logits
                     ], {
                         train_model.input: x,
                         train_model.targets: y,
                         train_model.initial_rnn_state: rnn_state
                     })
-
+                print(logits)
+                print(y)
                 avg_train_loss += 0.05 * (loss - avg_train_loss)
 
                 time_elapsed = time.time() - start_time

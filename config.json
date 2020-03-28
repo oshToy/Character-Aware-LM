@@ -1,13 +1,13 @@
 {
 "logs_folder":"./logs/",
-"data_sets_folder":"./data_sets",
+"data_sets_folder":"E://data_sets/",
 "trained_models_folder":"./trained_models_wer",
 "models":[{
  "data_set": "AMI",
  "training": true,
  "testing": false,
  "checkpoint_number_for_test_or_null_for_last_checkpoint": null,
- "checkpoint_file_for_test": null,
+ "checkpoint_file_for_test": "C:\\Users\\Ohad.Volk\\Desktop\\Oshri\\tf-lstm-char-cnn-master\\tf-lstm-char-cnn-master\\trained_models_wer\\AMI_2020-03-27--16-57-17\\epoch019_0.1657.model",
  "embedding": "kim fasttext",
  "fasttext_model_path": "E:\\RNNLM Project\\Models\\Wikipedia\\Lower Case\\15 Epoch\\Wikipedia_epoch15.model"
 }

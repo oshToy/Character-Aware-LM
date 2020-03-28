@@ -55,7 +55,7 @@ class Vocab:
         return cls(token2index, index2token)
 
 
-def load_data(data_dir, max_word_length, num_unroll_steps, eos='+'):
+def load_data(data_dir, max_word_length, num_unroll_steps, eos='+', datas=['train', 'valid', 'test']):
     char_vocab = Vocab()
     char_vocab.feed(' ')  # blank is at index 0 in char vocab
     char_vocab.feed('{')  # start is at index 1 in char vocab
@@ -71,7 +71,7 @@ def load_data(data_dir, max_word_length, num_unroll_steps, eos='+'):
     wers = {}
     words = {}
     acoustics = {}
-    for fname in ('train', 'valid', 'test'):
+    for fname in datas:
         wers[fname] = pd.Series(name='wer')
         words[fname] = list()
         acoustics[fname] = list()
@@ -79,12 +79,15 @@ def load_data(data_dir, max_word_length, num_unroll_steps, eos='+'):
         # with codecs.open(os.path.join(data_dir, fname + '.txt'), 'r', 'utf-8') as f:
         print(data_dir)
         for file in os.listdir(os.path.join(data_dir, fname)):
-            df = pd.read_csv(os.path.join(data_dir, fname, file))
+            df = pd.read_pickle(os.path.join(data_dir, fname, file))
+            # shuffle data in train
+            if data_dir == 'train':
+                df = df.sample(frac=1)
             df = df.dropna()
             print(str(df.shape))
             wers[fname] = wers[fname].append(df['wer'])
             for line in df.iterrows():
-                sent_acoustics = list(ast.literal_eval(line[1]['acustic_tuple']))
+                sent_acoustics = line[1]['acustic_tuple']
                 sent = line[1]['sent']
                 word_count_last_sent = 0
                 sent = sent.strip()
@@ -137,7 +140,7 @@ def load_data(data_dir, max_word_length, num_unroll_steps, eos='+'):
     # now we know the sizes, create tensors
     word_tensors = {}
     char_tensors = {}
-    for fname in ('train', 'valid', 'test'):
+    for fname in datas:
         assert len(char_tokens[fname]) == len(word_tokens[fname])
 
         word_tensors[fname] = np.array(word_tokens[fname] , dtype=np.int32)

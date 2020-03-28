@@ -171,7 +171,7 @@ def inference_graph(char_vocab_size, word_vocab_size,
 
     ''' First, embed characters '''
     with tf.variable_scope('Embedding'):
-        char_embedding = tf.get_variable('char_embedding', [36, char_embed_size])
+        char_embedding = tf.get_variable('char_embedding', [37, char_embed_size])
 
         ''' this op clears embedding vector of first symbol (symbol at position 0, which is by convention the position
         of the padding symbol). It can be used to mimic Torch7 embedding operator that keeps padding mapped to
@@ -222,13 +222,13 @@ def inference_graph(char_vocab_size, word_vocab_size,
         #For WER
         output = outputs[-1]
 
-        # linear projection onto output (word) vocab
+        # linear projection into output (word) vocab
         logits = []
         with tf.variable_scope('WordEmbedding') as scope:
             # for idx, output in enumerate(outputs):
             #     if idx > 0:
             #         scope.reuse_variables()
-            logits.append(linear(output, word_vocab_size))
+            logits.append(linear(output, 1))
 
     return adict(
         input=input_,

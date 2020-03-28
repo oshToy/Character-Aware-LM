@@ -36,7 +36,7 @@ def main():
     trained_models_folder = config_dict['trained_models_folder']
 
     for model in config_dict['models']:
-        logger = logger_for_print(folder=logs_folder, file_name=config_dict['data_sets_folder'])
+        logger = logger_for_print(folder=logs_folder)
         fasttext_model_path = model['fasttext_model_path']
 
         #copy_data_files(data_folder=data_sets_folder + model['data_set'])
@@ -47,15 +47,21 @@ def main():
                             'data directory. Should contain train.txt/valid.txt/test.txt with input data')
 
 
-        trained_model_folder = trained_models_folder + '/' + data_set + '_' + str(datetime.datetime.now().strftime('%Y-%m-%d--%H-%M-%S'))
-        flags.DEFINE_string('train_dir', trained_model_folder, 'training directory (models and summaries are saved there periodically)')
+
         flags.DEFINE_string('fasttext_model_path', fasttext_model_path, 'fasttext trained model path')
         flags.DEFINE_string('embedding', model['embedding'], 'embedding method')
 
         define_flags()
         if model['training']:
+            trained_model_folder = trained_models_folder + '/' + data_set + '_' + str(
+                datetime.datetime.now().strftime('%Y-%m-%d--%H-%M-%S'))
+            flags.DEFINE_string('train_dir', trained_model_folder,
+                                'training directory (models and summaries are saved there periodically)')
             train(logger)
         if model['testing']:
+            trained_model_folder = model['checkpoint_file_for_test']
+            flags.DEFINE_string('train_dir', os.path.dirname(os.path.abspath(trained_model_folder)),
+                                'training directory (models and summaries are saved there periodically)')
             checkpoint_file = checkpoint_file_from_number(model, trained_model_folder)
             logger("test on model file : " + str(checkpoint_file))
             if not checkpoint_file:
@@ -66,8 +72,8 @@ def main():
             test(logger)
 
 
-def checkpoint_file_from_number(model,trained_model_folder):
-    if model["checkpoint_file_for_test"]:
+def checkpoint_file_from_number(model, trained_model_folder):
+    if model["checkpoint_file_for_test"] is not None:
         return model["checkpoint_file_for_test"]
 
     files_list = os.listdir(trained_model_folder)
