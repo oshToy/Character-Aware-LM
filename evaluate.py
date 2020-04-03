@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import model
-from data_reader import load_data, DataReader, DataReaderFastText, FasttextModel
+from data_reader import load_test_data, TestDataReader, DataReaderFastText, FasttextModel
 
 FLAGS = tf.flags.FLAGS
 
@@ -67,11 +67,11 @@ def main(print):
         print('Checkpoint file not found', FLAGS.load_model_for_test)
         return -1
 
-    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list, wers, acoustics = \
-        load_data(FLAGS.data_dir, FLAGS.max_word_length, num_unroll_steps=FLAGS.num_unroll_steps, eos=FLAGS.EOS, datas=['test'])
+    word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list, wers, acoustics, files_name, kaldi_sents_index = \
+        load_test_data(FLAGS.data_dir, FLAGS.max_word_length, num_unroll_steps=FLAGS.num_unroll_steps, eos=FLAGS.EOS, datas=['test'])
 
-    test_reader = DataReader(word_tensors['test'], char_tensors['test'],
-                              FLAGS.batch_size, FLAGS.num_unroll_steps, wers['test'], word_vocab, char_vocab)
+    test_reader = TestDataReader(word_tensors['test'], char_tensors['test'],
+                              FLAGS.batch_size, FLAGS.num_unroll_steps, wers['test'], files_name['test'], kaldi_sents_index['test'])
 
     fasttext_model_path = None
     if FLAGS.fasttext_model_path:
@@ -125,10 +125,12 @@ def main(print):
         avg_loss = 0
         labels = []
         predictions = []
+        files_name_list = []
+        kaldi_sents_index_list = []
         start_time = time.time()
         for batch_kim, batch_ft in zip(test_reader.iter(), test_ft_reader.iter()):
             count += 1
-            x, y = batch_kim
+            x, y, files_name_batch, kaldi_sents_index_batch = batch_kim
             loss, logits = session.run([
                 m.loss,
                 m.logits
@@ -141,14 +143,29 @@ def main(print):
 
             labels.append(y)
             predictions.append(logits)
+            files_name_list.append(files_name_batch)
+            kaldi_sents_index_list.append(kaldi_sents_index_batch)
+
         avg_loss /= count
         time_elapsed = time.time() - start_time
 
         print("test loss = %6.8f, perplexity = %6.8f" % (avg_loss, np.exp(avg_loss)))
         print("test samples:" + str( count*FLAGS.batch_size) + "time elapsed:" + str( time_elapsed) + "time per one batch:" +str(time_elapsed/count))
 
-        pd.DataFrame({"lables": labels, "predictions": predictions}).to_csv(FLAGS.train_dir + '/test_results.csv')
+        df = pd.DataFrame({"labels": labels, "predictions": predictions,
+                      "files_name": files_name_list, "kaldi_sents_index": kaldi_sents_index_list})
 
+        df['predictions'] = df['predictions'].apply(lambda x: x[0])
+        final_df = pd.DataFrame()
+        final_df['labels'] = df.explode('labels')['labels']
+        final_df['predictions'] = df.explode('predictions')['predictions']
+        final_df['files_name'] = df.explode('files_name')['files_name']
+        final_df['kaldi_sents_index'] = df.explode('kaldi_sents_index')['kaldi_sents_index']
+        final_df.reset_index(drop=True, inplace=True)
+        for col in final_df.columns:
+            final_df[col] = final_df[col].apply(lambda column: column[0])
+
+        final_df.to_pickle(FLAGS.train_dir + '/test_results.pkl')
 
 
 if __name__ == "__main__":

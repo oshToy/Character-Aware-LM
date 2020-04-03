@@ -251,7 +251,8 @@ def loss_graph(logits, batch_size):
         # loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=target_list),
         #                       name='loss')
 
-        loss = tf.reduce_mean(tf.squared_difference(logits, targets), name='loss')
+        loss = tf.reduce_mean(tf.abs(tf.subtract(logits, targets)), name='loss')
+
     return adict(
         targets=targets,
         loss=loss

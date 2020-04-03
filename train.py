@@ -17,7 +17,7 @@ FLAGS = flags.FLAGS
 
 def define_flags():
     # data
-    flags.DEFINE_string('load_model_for_training', r"C:\Users\Ohad.Volk\Desktop\Oshri\tf-lstm-char-cnn-master\tf-lstm-char-cnn-master\trained_models\AMI_2020-03-18--14-03-41\epoch000_4.0648.model",
+    flags.DEFINE_string('load_model_for_training', r"C:\Users\Ohad.Volk\Desktop\Oshri\tf-lstm-char-cnn-master\tf-lstm-char-cnn-master\trained_models\AMI_2020-03-28--12-43-24\epoch012_3.5680.model",
                         '(optional) filename of the model to load. Useful for re-starting training from a checkpoint. example: epoch000_0.0614.model')
     # model params
     flags.DEFINE_integer('rnn_size', 650, 'size of LSTM internal state')
@@ -92,7 +92,7 @@ def main(print):
         fasttext_model_path = FLAGS.fasttext_model_path
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list, wers, acoustics = \
-        load_data(FLAGS.data_dir, FLAGS.max_word_length, num_unroll_steps=FLAGS.num_unroll_steps, eos=FLAGS.EOS)
+        load_data(FLAGS.data_dir, FLAGS.max_word_length, num_unroll_steps=FLAGS.num_unroll_steps, eos=FLAGS.EOS, batch_size=FLAGS.batch_size)
 
     fasttext_model = None
     if 'fasttext' in FLAGS.embedding:
@@ -247,8 +247,6 @@ def main(print):
                         train_model.targets: y,
                         train_model.initial_rnn_state: rnn_state
                     })
-                print(logits)
-                print(y)
                 avg_train_loss += 0.05 * (loss - avg_train_loss)
 
                 time_elapsed = time.time() - start_time
