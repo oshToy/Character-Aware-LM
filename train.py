@@ -109,12 +109,12 @@ def main(print):
                                              data='valid', acoustics=acoustics)
 
     train_reader = DataReader(word_tensors['train'], char_tensors['train'],
-                              FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'], word_vocab, char_vocab)
+                              FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'])
 
 
 
     valid_reader = DataReader(word_tensors['valid'], char_tensors['valid'],
-                              FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'], word_vocab, char_vocab)
+                              FLAGS.batch_size, FLAGS.num_unroll_steps, wers['valid'])
 
 
     # test_reader = DataReader(word_tensors['test'], char_tensors['test'],

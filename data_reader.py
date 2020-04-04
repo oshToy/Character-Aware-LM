@@ -360,7 +360,7 @@ class DataReader:
         self.num_unroll_steps = num_unroll_steps
 
     def iter(self):
-        for x, y, files_name, kaldi_sents_index in zip(self._x_batches, self._y_batches):
+        for x, y in zip(self._x_batches, self._y_batches):
             yield x, np.array(y).reshape(y.shape[0], 1)
 
 class TestDataReader:

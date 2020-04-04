@@ -20,3 +20,5 @@
 *.GPU-STUD-11
 *.xml
 *.txt
+*.csv
+*.pyc
