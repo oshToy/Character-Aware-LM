@@ -9,7 +9,7 @@
   "training": true,
   "testing": false,
   "checkpoint_number_for_test_or_null_for_last_checkpoint": null,
-  "checkpoint_file_for_test": "./trained_models/AMI_2019-09-13--13-16-00/epoch015_3.5988.model",
+  "checkpoint_file_for_test": "./trained_models/AMI_2020-04-03--19-33-29 TEST/epoch020_3.6655.model",
   "embedding":"kim fasttext",
   "fasttext_model_path": "E:\\RNNLM Project\\Models\\Wikipedia\\Lower Case\\15 Epoch\\Wikipedia_epoch15.model",
   "max_epochs": 30,

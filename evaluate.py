@@ -106,14 +106,15 @@ def main(print):
                     num_unroll_steps=FLAGS.num_unroll_steps,
                     dropout=0,
                     embedding=FLAGS.embedding,
-                    fasttext_word_dim=300)
+                    fasttext_word_dim=300,
+                    acoustic_features_dim=4)
             m.update(model.loss_graph(m.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
             global_step = tf.Variable(0, dtype=tf.int32, name='global_step')
 
         saver = tf.train.Saver()
         saver.restore(session, FLAGS.load_model_for_test)
-        print('Loaded model from' + str(FLAGS.load_model_for_test) + 'saved at global step' +str(global_step.eval()))
+        print('Loaded model from' + str(FLAGS.load_model_for_test) + 'saved at global step' + str(global_step.eval()))
 
         ''' training starts here '''
         rnn_state = session.run(m.initial_rnn_state)
@@ -123,12 +124,13 @@ def main(print):
         for batch_kim, batch_ft in zip(test_reader.iter(), test_ft_reader.iter()):
             count += 1
             x, y = batch_kim
-            loss, rnn_state = session.run([
+            loss, rnn_state, logits = session.run([
                 m.loss,
-                m.final_rnn_state
+                m.final_rnn_state,
+                m.logits
             ], {
                 m.input2: batch_ft,
-                m.input  : x,
+                m.input: x,
                 m.targets: y,
                 m.initial_rnn_state: rnn_state
             })

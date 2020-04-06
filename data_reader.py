@@ -52,7 +52,7 @@ class Vocab:
         return cls(token2index, index2token)
 
 
-def load_data(data_dir, max_word_length, eos='+'):
+def load_data(data_dir, max_word_length, eos='+', envs=['train', 'valid', 'test']):
     char_vocab = Vocab()
     char_vocab.feed(' ')  # blank is at index 0 in char vocab
     char_vocab.feed('{')  # start is at index 1 in char vocab
@@ -66,7 +66,7 @@ def load_data(data_dir, max_word_length, eos='+'):
     word_tokens = collections.defaultdict(list)
     char_tokens = collections.defaultdict(list)
     words = {}
-    for fname in ('train', 'valid', 'test'):
+    for fname in envs:
         words[fname] = list()
         print('reading', fname)
         with codecs.open(os.path.join(data_dir, fname + '.txt'), 'r', 'utf-8') as f:
@@ -121,7 +121,7 @@ def load_data(data_dir, max_word_length, eos='+'):
 
 
 class FasttextModel:
-    def __init__(self,fasttext_path=None):
+    def __init__(self, fasttext_path=None):
         self.fasttext_model = FastText.load(fasttext_path)
 
     def get_fasttext_model(self):

@@ -1,6 +1,6 @@
 import logging
 import os
-from train import main as train ,define_flags
+from train import main as train, define_flags
 from evaluate import main as test
 import datetime
 import json
