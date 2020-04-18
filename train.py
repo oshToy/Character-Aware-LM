@@ -6,9 +6,8 @@ import os
 import time
 import numpy as np
 import tensorflow as tf
-
 import model
-from data_reader import load_data, DataReader, FasttextModel, DataReaderFastText
+from data_reader import load_data, DataReader, FasttextModel, DataReaderFastText, TestDataReader, load_test_data
 import pandas as pd
 
 flags = tf.flags
@@ -17,7 +16,7 @@ FLAGS = flags.FLAGS
 
 def define_flags():
     # data
-    flags.DEFINE_string('load_model_for_training', r"C:\Users\Ohad.Volk\Desktop\Oshri\tf-lstm-char-cnn-master\tf-lstm-char-cnn-master\trained_models\AMI_2020-03-28--12-43-24\epoch012_3.5680.model",
+    flags.DEFINE_string('load_model_for_training', r"E:\Trained Models\AMI_2020-03-28--12-43-24\epoch012_3.5680.model",
                         '(optional) filename of the model to load. Useful for re-starting training from a checkpoint. example: epoch000_0.0614.model')
     # model params
     flags.DEFINE_integer('rnn_size', 650, 'size of LSTM internal state')
@@ -31,7 +30,7 @@ def define_flags():
     # optimization
     flags.DEFINE_float('learning_rate_decay', 0.5, 'learning rate decay')
     flags.DEFINE_float('learning_rate', 1.0, 'starting learning rate')
-    flags.DEFINE_float('decay_when', 0.00001, 'decay if validation mse does not improve by more than this much')
+    flags.DEFINE_float('decay_when', 20, 'decay if validation mse does not improve by more than this much')
     flags.DEFINE_float('param_init', 0.05, 'initialize parameters at')
     flags.DEFINE_integer('num_unroll_steps', 20, 'number of timesteps to unroll for')
     flags.DEFINE_integer('batch_size', 25, 'number of sequences to train on in parallel')
@@ -84,7 +83,9 @@ def main(print):
         print('Created training directory' + FLAGS.train_dir)
 
     # CSV initialize
-    pd.DataFrame(FLAGS.flag_values_dict(), index=range(1)).to_csv(FLAGS.train_dir + '/train_parameters.csv')
+    df_train_params = pd.DataFrame(FLAGS.flag_values_dict(), index=range(1))
+    df_train_params['comment'] = ''
+    df_train_params.to_csv(FLAGS.train_dir + '/train_parameters.csv')
     epochs_results = initialize_epoch_data_dict()
 
     fasttext_model_path = None
@@ -93,6 +94,11 @@ def main(print):
 
     word_vocab, char_vocab, word_tensors, char_tensors, max_word_length, words_list, wers, acoustics = \
         load_data(FLAGS.data_dir, FLAGS.max_word_length, num_unroll_steps=FLAGS.num_unroll_steps, eos=FLAGS.EOS, batch_size=FLAGS.batch_size)
+
+    word_vocab_valid, char_vocab_valid, word_tensors_valid, char_tensors_valid, max_word_length_valid, words_list_valid, wers_valid,\
+    acoustics_valid, files_name_valid, kaldi_sents_index_valid = \
+        load_test_data(FLAGS.data_dir, FLAGS.max_word_length, num_unroll_steps=FLAGS.num_unroll_steps, eos=FLAGS.EOS,
+                       datas=['valid'])
 
     fasttext_model = None
     if 'fasttext' in FLAGS.embedding:
@@ -112,10 +118,9 @@ def main(print):
                               FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'])
 
 
-
-    valid_reader = DataReader(word_tensors['valid'], char_tensors['valid'],
-                              FLAGS.batch_size, FLAGS.num_unroll_steps, wers['valid'])
-
+    valid_reader = TestDataReader(word_tensors_valid['valid'], char_tensors_valid['valid'],
+                                 FLAGS.batch_size, FLAGS.num_unroll_steps, wers_valid['valid'], files_name_valid['valid'],
+                                 kaldi_sents_index_valid['valid'])
 
     # test_reader = DataReader(word_tensors['test'], char_tensors['test'],
     #                          FLAGS.batch_size, FLAGS.num_unroll_steps, wers['train'], word_vocab, char_vocab)
@@ -160,8 +165,8 @@ def main(print):
         ''' build graph for validation and testing (shares parameters with the training graph!) '''
         with tf.variable_scope("Model", reuse=True):
             valid_model = model.inference_graph(
-                char_vocab_size=char_vocab.size,
-                word_vocab_size=word_vocab.size,
+                char_vocab_size=char_vocab_valid.size,
+                word_vocab_size=word_vocab_valid.size,
                 char_embed_size=FLAGS.char_embed_size,
                 batch_size=FLAGS.batch_size,
                 num_highway_layers=FLAGS.highway_layers,
@@ -266,28 +271,39 @@ def main(print):
             epochs_results['epoch_training_time'].append(str(time.time() - epoch_start_time))
 
             # epoch done: time to evaluate
-            avg_valid_loss = 0.0
+            avg_valid_loss = 0.
+            labels = []
+            predictions = []
+            files_name_list = []
+            kaldi_sents_index_list = []
+
             count = 0
             rnn_state = session.run(valid_model.initial_rnn_state)
             for batch_kim, batch_ft in zip(valid_reader.iter(), valid_ft_reader.iter()):
-                x, y = batch_kim
+
+                x, y, files_name_batch, kaldi_sents_index_batch = batch_kim
                 count += 1
                 start_time = time.time()
 
-                loss, rnn_state = session.run([
+                loss, logits = session.run([
                     valid_model.loss,
-                    valid_model.final_rnn_state
+                    valid_model.logits
                 ], {
                     valid_model.input2: batch_ft,
                     valid_model.input: x,
                     valid_model.targets: y,
                     valid_model.initial_rnn_state: rnn_state,
                 })
+                labels.append(y)
+                predictions.append(logits)
+                files_name_list.append(files_name_batch)
+                kaldi_sents_index_list.append(kaldi_sents_index_batch)
 
                 if count % FLAGS.print_every == 0:
                     string = str("\t> validation loss = %6.8f" % (loss))
                     print(string)
-                avg_valid_loss += loss / valid_reader.length
+
+            avg_valid_loss = get_valid_rescore_loss(labels, predictions, files_name_list, kaldi_sents_index_list)
 
             print("at the end of epoch:" + str(epoch))
             epochs_results['epoch_number'].append(str(epoch))
@@ -305,7 +321,7 @@ def main(print):
             current_learning_rate = session.run(train_model.learning_rate)
 
             ''' decide if need to decay learning rate '''
-            if best_valid_loss is not None and avg_valid_loss >best_valid_loss - FLAGS.decay_when:
+            if best_valid_loss is not None and avg_valid_loss > best_valid_loss - FLAGS.decay_when:
                 print('validation perplexity did not improve enough, decay learning rate')
                 current_learning_rate = session.run(train_model.learning_rate)
                 string = str('learning rate was:' + str(current_learning_rate))
@@ -332,6 +348,37 @@ def main(print):
     # Save model performance data
     pd.DataFrame(epochs_results).to_csv(FLAGS.train_dir + '/train_results.csv')
 
+
+def get_valid_rescore_loss(labels, predictions, files_name_list, kaldi_sents_index_list):
+    df = pd.DataFrame({"labels": labels, "predictions": predictions,
+                       "files_name": files_name_list, "kaldi_sents_index": kaldi_sents_index_list})
+
+    df['predictions'] = df['predictions'].apply(lambda x: x[0])
+    final_df = pd.DataFrame()
+    final_df['labels'] = df.explode('labels')['labels']
+    final_df['predictions'] = df.explode('predictions')['predictions']
+    final_df['files_name'] = df.explode('files_name')['files_name']
+    final_df['kaldi_sents_index'] = df.explode('kaldi_sents_index')['kaldi_sents_index']
+    final_df.reset_index(drop=True, inplace=True)
+    for col in final_df.columns:
+        final_df[col] = final_df[col].apply(lambda column: column[0])
+
+    def get_wers_results(group):
+        file_name = group.name
+
+        our_best_prediction_index = group['predictions'].values.argmin()
+        our_wer_label = group.iloc[our_best_prediction_index]['labels']
+
+        kaldis_best_prediction_row = group[group['kaldi_sents_index'] == 1]
+        kaldis_wer_label = kaldis_best_prediction_row['labels']
+
+        min_wer = min(our_wer_label, kaldis_wer_label.values)
+        return pd.DataFrame(
+            {'file_name': file_name, 'our_wer_label': our_wer_label, 'kaldis_wer_label': kaldis_wer_label,
+             'min': min_wer})
+
+    results = final_df.groupby('files_name').apply(get_wers_results)
+    return results['our_wer_label'].sum()
 
 if __name__ == "__main__":
     tf.app.run()

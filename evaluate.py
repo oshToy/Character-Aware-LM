@@ -166,7 +166,23 @@ def main(print):
             final_df[col] = final_df[col].apply(lambda column: column[0])
 
         final_df.to_pickle(FLAGS.train_dir + '/test_results.pkl')
+    def get_wers_results(group):
+        file_name = group.name
 
+        our_best_prediction_index = group['predictions'].values.argmin()
+        our_wer_label = group.iloc[our_best_prediction_index]['labels']
+
+        kaldis_best_prediction_row = group[group['kaldi_sents_index'] == 1]
+        kaldis_wer_label = kaldis_best_prediction_row['labels']
+
+        min_wer = min(our_wer_label, kaldis_wer_label.values)
+        return pd.DataFrame(
+            {'file_name': file_name, 'our_wer_label': our_wer_label, 'kaldis_wer_label': kaldis_wer_label,
+             'min': min_wer})
+
+    # results = final_df.groupby('files_name').apply(get_wers_results)
+    # results.to_pickle(FLAGS.train_dir + '/test_results.pkl')
+    # print(results['our_wer_label'].sum())
 
 if __name__ == "__main__":
     tf.app.run()

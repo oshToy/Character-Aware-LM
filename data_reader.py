@@ -183,7 +183,6 @@ def load_test_data(data_dir, max_word_length, num_unroll_steps, eos='+', datas=[
         words[fname] = list()
         acoustics[fname] = list()
 
-
         print('reading', fname)
         # with codecs.open(os.path.join(data_dir, fname + '.txt'), 'r', 'utf-8') as f:
         print(data_dir)
