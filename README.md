@@ -104,10 +104,3 @@ the afghan people have a series that 's really heard to share legislation for <u
 he is going to hold his ...
 ```
 
-## Contributors
-
-[Nicole](https://github.com/hejunqing)
-
-[David](https://github.com/pythonner)
-
-[derluke](https://github.com/derluke)
