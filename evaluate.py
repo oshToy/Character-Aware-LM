@@ -55,6 +55,8 @@ def save_data_to_csv(avg_loss,count,time_elapsed):
     test_results["time_per_batch"].append(time_elapsed / count)
 
     pd.DataFrame(test_results, index=range(1)).to_csv(FLAGS.train_dir + '/test_results.csv')
+
+
 def main(print):
     ''' Loads trained model and evaluates it on test split '''
     if FLAGS.load_model_for_test is None:

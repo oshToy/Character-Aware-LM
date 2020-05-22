@@ -97,7 +97,7 @@ def run():
     print('Loaded model from', FLAGS.load_model)
 
     ''' training starts here '''
-    return session, m, fasttext_model, max_word_length, char_vocab
+    return session, m, fasttext_model, max_word_length, char_vocab, word_vocab
 
 
 def run_t():

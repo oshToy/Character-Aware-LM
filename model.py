@@ -141,9 +141,9 @@ def tdnn(input_, kernels, kernel_features, scope='TDNN'):
     return output
 
 
-def merge_embedding(embedding_x, embedding_y, method):
+def merge_embedding(embedding_x, embedding_y, method, scope_name):
     if method == 'addition':
-        return tf.add(embedding_x, embedding_y)
+        return tf.add(embedding_x, embedding_y, name=scope_name)
     return None
 
 
@@ -193,7 +193,8 @@ def inference_graph(char_vocab_size, word_vocab_size,
         input2_ = tf.reshape(input2_, [fasttext_word_dim + acoustic_features_dim, -1])
         input_mofified_ft = linearFT(input2_, tf.Dimension(1100), scope='fastTextFC')
         input_mofified_ft = tf.nn.relu(input_mofified_ft) #Added RELU to matrix after FT
-        input_cnn = merge_embedding(input_cnn,input_mofified_ft, r'addition')
+        merged_embedding = merge_embedding(input_cnn, input_mofified_ft, r'addition', 'merged_embedding')
+        input_cnn = merged_embedding
 
     ''' Maybe apply Highway '''
     if num_highway_layers > 0:
@@ -237,7 +238,8 @@ def inference_graph(char_vocab_size, word_vocab_size,
             initial_rnn_state=initial_rnn_state,
             final_rnn_state=final_rnn_state,
             rnn_outputs=outputs,
-            logits=logits
+            logits=logits,
+            merged_embedding=merged_embedding
         )
     else:
         return adict(
@@ -256,7 +258,7 @@ def loss_graph(logits, batch_size, num_unroll_steps):
     with tf.variable_scope('Loss'):
         targets = tf.placeholder(tf.int64, [batch_size, num_unroll_steps], name='targets')
         target_list = [tf.squeeze(x, [1]) for x in tf.split(targets, num_unroll_steps, 1)]
-
+        # probas = tf.nn.softmax(logits)
         loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=target_list),
                               name='loss')
 

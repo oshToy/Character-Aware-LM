@@ -224,7 +224,7 @@ def main(print):
                 start_time = time.time()
                 if fasttext_model:
                     ft_vectors = fasttext_model.wv[words_list['train'][count]].reshape(fasttext_model.wv.vector_size, 1)
-                    loss, _, rnn_state, gradient_norm, step, _ = session.run([
+                    loss, _, rnn_state, gradient_norm, step, _, probas = session.run([
                         train_model.loss,
                         train_model.train_op,
                         train_model.final_rnn_state,

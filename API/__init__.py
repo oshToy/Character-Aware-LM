@@ -2,6 +2,7 @@ import tensorflow as tf
 from API.init_model import run as init_model
 from API.embedding import get_embedding
 from API.sentence_embedding import get_sentence_embedding
+from API.generate import generate
 from gensim.test.utils import get_tmpfile
 from gensim.models.callbacks import CallbackAny2Vec
 
@@ -33,10 +34,11 @@ class CharacterAwareLM:
         self.max_word_length = None
         self.rnn_state = None
         self.char_vocab = None
+        self.word_vocab = None
         self.load_model()
 
     def load_model(self):
-        self.session, self.m, self.fasttext_model, self.max_word_length, self.char_vocab = init_model()
+        self.session, self.m, self.fasttext_model, self.max_word_length, self.char_vocab, self.word_vocab = init_model()
         self.rnn_state = self.session.run(self.m.initial_rnn_state)
 
     def words_embedding(self, sentence: str):
@@ -54,19 +56,22 @@ class CharacterAwareLM:
 
     def sentence_embedding(self, sentence):
         # rnn outputs
-        return get_sentence_embedding(sentence, self.session, self.m, self.fasttext_model, self.max_word_length, self.char_vocab,
-                             self.rnn_state)
+        return get_sentence_embedding(sentence, self.session, self.m, self.fasttext_model, self.max_word_length,
+                                      self.char_vocab,
+                                      self.rnn_state)
 
     def sentence_probability(self, sentence):
         return 'sentence_probability'
 
-    def generate_words(self, num_words, temperature):
-        # generate(num_words, temperature)
-        return
+    def generate_words(self, num_samples, temperature):
+        return generate(num_samples, self.session, self.m, self.fasttext_model, self.max_word_length, self.char_vocab,
+                        self.rnn_state,
+                        temperature, self.word_vocab)
 
 
 if __name__ == '__main__':
     model = CharacterAwareLM()
+    model.generate_words(100, 0.5)
     model.words_embedding('test')
     model.words_embedding('i love you')
-    print(model.sentence_embedding('i love you'))
+    model.sentence_embedding('i love you')
