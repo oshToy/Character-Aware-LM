@@ -1,13 +1,9 @@
 import numpy as np
 
 
-def sentence_pre_process(sentence):
-    return str(sentence).lower()
-
-
 def generate(num_samples, session, m, fasttext_model, max_word_length, char_vocab, rnn_state, temperature, word_vocab):
     logits = np.ones((word_vocab.size,))
-    merged_embedding_dict = {}
+    generated_sentences = ['']
     for i in range(num_samples):
         logits = logits / temperature
         prob = np.exp(logits)
@@ -19,11 +15,11 @@ def generate(num_samples, session, m, fasttext_model, max_word_length, char_voca
         input_2 = np.reshape((np.concatenate((words_tf, np.zeros(4))).T), (-1, 1))
 
         if word == '|':  # EOS
-            print('<unk>', end=' ')
+            generated_sentences[-1] = generated_sentences[-1] + ' <unk>'
         elif word == '+':
-            print('\n')
+            generated_sentences.append('')
         else:
-            print(word, end=' ')
+            generated_sentences[-1] = generated_sentences[-1] + ' ' + word
 
         char_input = np.zeros((1, 1, max_word_length))
         for i, c in enumerate('{' + word + '}'):
@@ -35,4 +31,4 @@ def generate(num_samples, session, m, fasttext_model, max_word_length, char_voca
                                          m.initial_rnn_state: rnn_state})
         logits = np.array(logits)
 
-    return merged_embedding_dict
+    return generated_sentences

@@ -2,6 +2,7 @@ import tensorflow as tf
 from API.init_model import run as init_model
 from API.embedding import get_embedding
 from API.sentence_embedding import get_sentence_embedding
+from API.sentence_probability import get_sentence_probability
 from API.generate import generate
 from gensim.test.utils import get_tmpfile
 from gensim.models.callbacks import CallbackAny2Vec
@@ -41,9 +42,9 @@ class CharacterAwareLM:
         self.session, self.m, self.fasttext_model, self.max_word_length, self.char_vocab, self.word_vocab = init_model()
         self.rnn_state = self.session.run(self.m.initial_rnn_state)
 
-    def words_embedding(self, sentence: str):
+    def words_embedding(self, words: str):
         """
-        :param sentence: string of words. for example: "Hello World"
+        :param words: string of words. for example: "Hello World"
         :return: dict of words as keys and value embedding as value.
             word embedding size is (1,1100)
         for example: {
@@ -51,7 +52,7 @@ class CharacterAwareLM:
         "World":[[..,..]],
         }
         """
-        return get_embedding(sentence, self.session, self.m, self.fasttext_model, self.max_word_length, self.char_vocab,
+        return get_embedding(words, self.session, self.m, self.fasttext_model, self.max_word_length, self.char_vocab,
                              self.rnn_state)
 
     def sentence_embedding(self, sentence):
@@ -61,7 +62,9 @@ class CharacterAwareLM:
                                       self.rnn_state)
 
     def sentence_probability(self, sentence):
-        return 'sentence_probability'
+        return get_sentence_probability(sentence, self.session, self.m, self.fasttext_model, self.max_word_length,
+                                      self.char_vocab,
+                                      self.rnn_state, self.word_vocab)
 
     def generate_words(self, num_samples, temperature):
         return generate(num_samples, self.session, self.m, self.fasttext_model, self.max_word_length, self.char_vocab,
@@ -71,7 +74,8 @@ class CharacterAwareLM:
 
 if __name__ == '__main__':
     model = CharacterAwareLM()
-    model.generate_words(100, 0.5)
-    model.words_embedding('test')
-    model.words_embedding('i love you')
-    model.sentence_embedding('i love you')
+    model.generate_words(num_samples=100, temperature=0.5)
+    model.words_embedding(words='test')
+    model.words_embedding(words='i love you')
+    model.sentence_embedding(sentence='i love you')
+    model.sentence_probability(sentence='i love you')
