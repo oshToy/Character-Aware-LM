@@ -31,13 +31,6 @@ def get_sentence_probability(sentence, session, m, fasttext_model, max_word_leng
         words_tf = fasttext_model.wv[word]
         input_2 = np.reshape((np.concatenate((words_tf, np.zeros(4))).T), (-1, 1))
 
-        if word == '|':
-            print('<unk>', end=' ')
-        elif word == '+':  # EOS
-            print('\n')
-        else:
-            print(word, end=' ')
-
         char_input = np.zeros((1, 1, max_word_length))
         for i, c in enumerate('{' + word + '}'):
             char_input[0, 0, i] = char_vocab[c]

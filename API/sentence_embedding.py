@@ -15,10 +15,9 @@ def get_sentence_embedding(sentence, session, m, fasttext_model, max_word_length
         for i, c in enumerate('{' + word + '}'):
             char_input[0, 0, i] = char_vocab[c]
 
-        rnn_outputs = session.run([m.rnn_outputs],
+        rnn_outputs, rnn_state = session.run([m.rnn_outputs, m.final_rnn_state],
                                                     {m.input: char_input,
                                                      m.input2: input_2,
                                                      m.initial_rnn_state: rnn_state})
-        rnn_outputs
 
-    return rnn_outputs
+    return rnn_outputs, rnn_state

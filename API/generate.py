@@ -1,7 +1,8 @@
 import numpy as np
 
 
-def generate(num_samples, session, m, fasttext_model, max_word_length, char_vocab, rnn_state, temperature, word_vocab):
+def generate(num_samples, session, m, fasttext_model, max_word_length, char_vocab, rnn_state, temperature, word_vocab,
+             single_sentence=False):
     logits = np.ones((word_vocab.size,))
     generated_sentences = ['']
     for i in range(num_samples):
@@ -17,6 +18,8 @@ def generate(num_samples, session, m, fasttext_model, max_word_length, char_voca
         if word == '|':  # EOS
             generated_sentences[-1] = generated_sentences[-1] + ' <unk>'
         elif word == '+':
+            if single_sentence:
+                return generated_sentences
             generated_sentences.append('')
         else:
             generated_sentences[-1] = generated_sentences[-1] + ' ' + word
