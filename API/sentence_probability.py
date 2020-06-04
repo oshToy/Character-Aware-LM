@@ -41,4 +41,4 @@ def get_sentence_probability(sentence, session, m, fasttext_model, max_word_leng
                                          m.initial_rnn_state: rnn_state})
         logits = np.array(logits)
 
-    return prob_list
+    return np.sum(np.log(prob_list))
