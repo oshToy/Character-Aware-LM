@@ -155,10 +155,7 @@ def main(print):
                 acoustic_features_dim=4)
             train_model.update(model.loss_graph(train_model.logits, FLAGS.batch_size, FLAGS.num_unroll_steps))
 
-            # scaling loss by FLAGS.num_unroll_steps effectively scales gradients by the same factor.
-            # we need it to reproduce how the original Torch code optimizes. Without this, our gradients will be
-            # much smaller (i.e. 35 times smaller) and to get system to learn we'd have to scale learning rate and max_grad_norm appropriately.
-            # Thus, scaling gradients so that this trainer is exactly compatible with the original
+
             train_model.update(model.training_graph(train_model.loss * FLAGS.num_unroll_steps,
                                                     FLAGS.learning_rate, FLAGS.max_grad_norm))
 
