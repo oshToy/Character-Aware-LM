@@ -79,12 +79,6 @@ def linear(input_, output_size, scope=None):
 
     return tf.matmul(input_, tf.transpose(matrix)) + bias_term
 
-def connection(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Embedding Connection'):
-    '''
-    connection between 2 types of embedding
-    '''
-    with tf.variable_scope(scope):
-     return
 def highway(input_, size, num_layers=1, bias=-2.0, f=tf.nn.relu, scope='Highway'):
     """Highway Network (cf. http://arxiv.org/abs/1505.00387).
 
